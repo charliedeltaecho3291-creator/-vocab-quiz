@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#3f6fa8">
+<title>英単語クイズ</title>
+<style>
+  :root {
+    --color-bg: #f4f6f9;
+    --color-card: #ffffff;
+    --color-primary: #3f6fa8;
+    --color-primary-dark: #2f5686;
+    --color-success: #3f9a6e;
+    --color-error: #d1555c;
+    --color-text: #24303f;
+    --color-text-muted: #6b7684;
+    --color-border: #e2e6ec;
+    --radius: 14px;
+  }
+  html { -webkit-text-size-adjust: 100%; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  input, textarea, button, select { font-family: inherit; }
+  input[type="search"], input[type="text"], textarea { font-size: 16px; }
+
+  #app { max-width: 480px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+
+  .app-header { padding-top: calc(env(safe-area-inset-top) + 16px); padding-bottom: 12px; text-align: center; }
+  .app-header h1 { font-size: 1.2rem; margin: 0; color: var(--color-primary-dark); letter-spacing: .02em; }
+
+  .app-main { flex: 1; padding: 8px 16px calc(84px + env(safe-area-inset-bottom)); }
+  .view { display: flex; flex-direction: column; gap: 14px; padding-top: 8px; }
+
+  .bottom-nav {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    max-width: 480px; margin: 0 auto;
+    display: flex; background: #fff; border-top: 1px solid var(--color-border);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .nav-btn { flex: 1; border: none; background: none; padding: 10px 0 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.72rem; color: var(--color-text-muted); }
+  .nav-btn .nav-icon { font-size: 1.3rem; line-height: 1; }
+  .nav-btn.active { color: var(--color-primary); font-weight: 600; }
+
+  .card { background: var(--color-card); border-radius: var(--radius); padding: 18px; box-shadow: 0 1px 3px rgba(20,30,50,0.06); }
+
+  .btn { display: block; width: 100%; padding: 14px; border-radius: 10px; border: none; font-size: 1rem; font-weight: 600; margin-top: 10px; min-height: 48px; cursor: pointer; }
+  .btn-primary { background: var(--color-primary); color: #fff; }
+  .btn-primary:active { background: var(--color-primary-dark); }
+  .btn-secondary { background: #eef2f7; color: var(--color-primary-dark); }
+  .btn-outline { background: #fff; border: 1px solid var(--color-border); color: var(--color-text); }
+
+  .mode-toggle { display: flex; background: #eef1f5; border-radius: 10px; padding: 4px; }
+  .mode-btn { flex: 1; border: none; background: none; padding: 10px 0; border-radius: 8px; font-size: 0.9rem; font-weight: 600; color: var(--color-text-muted); min-height: 40px; }
+  .mode-btn.active { background: #fff; color: var(--color-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+
+  .progress-text { text-align: center; font-size: 0.85rem; color: var(--color-text-muted); }
+
+  .question-card { text-align: center; }
+  .japanese-text { font-size: 1.3rem; font-weight: 500; color: var(--color-text); margin-bottom: 18px; line-height: 1.6; }
+  .english-text { font-size: 1.5rem; font-weight: 700; color: var(--color-primary-dark); margin-bottom: 10px; }
+  .example-text { font-size: 0.95rem; color: var(--color-text); font-style: italic; margin-top: 14px; line-height: 1.5; }
+  .example-ja-text { font-size: 0.85rem; color: var(--color-text-muted); margin-top: 4px; line-height: 1.5; }
+
+  .choices { display: flex; flex-direction: column; gap: 10px; }
+  .choice-btn { padding: 14px; border-radius: 10px; border: 1px solid var(--color-border); background: #fff; font-size: 1.05rem; font-weight: 600; color: var(--color-text); min-height: 48px; }
+  .choice-btn:active { background: #eef2f7; }
+
+  .result-text { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
+  .result-text.correct { color: var(--color-success); }
+  .result-text.incorrect { color: var(--color-error); }
+  .answer-detail { border-top: 1px solid var(--color-border); margin-top: 14px; padding-top: 14px; }
+
+  .flashcard-buttons { display: flex; gap: 10px; margin-top: 6px; }
+  .flashcard-buttons .btn { margin-top: 0; }
+
+  .session-complete { text-align: center; }
+  .complete-title { font-size: 1.3rem; margin-bottom: 6px; }
+
+  .empty-state { text-align: center; padding-top: 60px; color: var(--color-text-muted); }
+
+  .search-bar input { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--color-border); background: #fff; }
+  .count-text { font-size: 0.8rem; color: var(--color-text-muted); text-align: right; }
+  .word-card { background: #fff; border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(20,30,50,0.05); }
+  .word-card .english-text { font-size: 1.15rem; margin-bottom: 4px; }
+  .word-card .japanese-text { font-size: 0.95rem; font-weight: 500; color: var(--color-text); margin-bottom: 0; }
+  .word-card .example-text { margin-top: 8px; }
+  #list-results { display: flex; flex-direction: column; gap: 10px; }
+  .empty-msg { text-align: center; color: var(--color-text-muted); padding: 30px 0; }
+
+  textarea { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--color-border); resize: vertical; }
+  .hint { font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.6; margin: 6px 0 12px; }
+  .message { font-size: 0.85rem; margin-top: 10px; min-height: 1.2em; }
+  .message.success { color: var(--color-success); }
+  .message.error { color: var(--color-error); }
+  h2 { font-size: 1rem; margin: 0 0 4px; color: var(--color-primary-dark); }
+  details.example-json { margin-top: 14px; font-size: 0.85rem; }
+  details.example-json summary { cursor: pointer; color: var(--color-primary); font-weight: 600; }
+  details.example-json pre { background: #f4f6f9; padding: 10px; border-radius: 8px; overflow-x: auto; font-size: 0.75rem; margin-top: 8px; }
+  .file-label { text-align: center; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function(){
+  "use strict";
+
+  var STORAGE_KEY = "vocabQuizWords_v1";
+
+  var SAMPLE_DATA = [
+    { english: "get the hang of", japanese: "コツをつかむ", example: "It took me a while to get the hang of the new system.", exampleJa: "新しいシステムのコツをつかむのに少し時間がかかった。" },
+    { english: "on the fence", japanese: "決めかねている、迷っている", example: "I'm still on the fence about which job offer to accept.", exampleJa: "どちらの内定を受けるかまだ迷っている。" },
+    { english: "procrastinate", japanese: "先延ばしにする", example: "I always procrastinate when it comes to doing my taxes.", exampleJa: "確定申告のことになるといつも先延ばしにしてしまう。" },
+    { english: "a piece of cake", japanese: "とても簡単なこと", example: "Don't worry, the exam was a piece of cake.", exampleJa: "心配しないで、その試験はとても簡単だった。" },
+    { english: "make ends meet", japanese: "生活をやりくりする、収支を合わせる", example: "It's hard to make ends meet with rising prices.", exampleJa: "物価上昇でやりくりするのは大変だ。" }
+  ];
+
+  var state = {
+    view: "quiz",
+    words: [],
+    quiz: {
+      mode: "choice",
+      queue: [],
+      masteredCount: 0,
+      totalUnique: 0,
+      questionNumber: 0,
+      current: null,
+      answered: false,
+      selectedChoice: null,
+      isCorrect: null,
+      choices: [],
+      revealed: false,
+      finished: false
+    },
+    list: { query: "" }
+  };
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, function (ch) {
+      switch (ch) {
+        case "&": return "&amp;";
+        case "<": return "&lt;";
+        case ">": return "&gt;";
+        case '"': return "&quot;";
+        case "'": return "&#39;";
+      }
+    });
+  }
+
+  function shuffle(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+  }
+
+  var memoryWords = null;
+  var hasStorage = (function () {
+    try {
+      var testKey = "__vocabQuizStorageTest__";
+      localStorage.setItem(testKey, "1");
+      localStorage.removeItem(testKey);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  })();
+
+  function loadWords() {
+    if (!hasStorage) {
+      memoryWords = SAMPLE_DATA.slice();
+      return memoryWords;
+    }
+    var raw;
+    try {
+      raw = localStorage.getItem(STORAGE_KEY);
+    } catch (e) {
+      hasStorage = false;
+      memoryWords = SAMPLE_DATA.slice();
+      return memoryWords;
+    }
+    if (raw === null) {
+      saveWords(SAMPLE_DATA);
+      return SAMPLE_DATA.slice();
+    }
+    try {
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveWords(words) {
+    if (!hasStorage) {
+      memoryWords = words;
+      return;
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+    } catch (e) {
+      hasStorage = false;
+      memoryWords = words;
+    }
+  }
+
+  function validateWordArray(data, opts) {
+    opts = opts || {};
+    if (!Array.isArray(data)) {
+      return { valid: false, error: "JSONは配列（[ ]）である必要があります。" };
+    }
+    if (!opts.allowEmpty && data.length === 0) {
+      return { valid: false, error: "配列が空です。1件以上の単語を含めてください。" };
+    }
+    var required = ["english", "japanese", "example", "exampleJa"];
+    for (var i = 0; i < data.length; i++) {
+      var item = data[i];
+      if (typeof item !== "object" || item === null || Array.isArray(item)) {
+        return { valid: false, error: (i + 1) + "番目の要素がオブジェクトではありません。" };
+      }
+      for (var k = 0; k < required.length; k++) {
+        var key = required[k];
+        if (typeof item[key] !== "string" || item[key].trim() === "") {
+          return { valid: false, error: (i + 1) + "番目の要素に \"" + key + "\"（文字列）がありません。" };
+        }
+      }
+    }
+    var words = data.map(function (item) {
+      return {
+        english: item.english.trim(),
+        japanese: item.japanese.trim(),
+        example: item.example.trim(),
+        exampleJa: item.exampleJa.trim()
+      };
+    });
+    return { valid: true, words: words };
+  }
+
+  // ---- Quiz session logic ----
+
+  function startQuizSession() {
+    var q = state.quiz;
+    q.queue = shuffle(state.words.slice());
+    q.masteredCount = 0;
+    q.totalUnique = state.words.length;
+    q.questionNumber = 0;
+    q.current = null;
+    q.answered = false;
+    q.revealed = false;
+    q.selectedChoice = null;
+    q.isCorrect = null;
+    q.finished = q.totalUnique === 0;
+    if (!q.finished) advanceQuestion();
+  }
+
+  function advanceQuestion() {
+    var q = state.quiz;
+    if (q.queue.length === 0) {
+      q.finished = true;
+      q.current = null;
+      return;
+    }
+    q.current = q.queue.shift();
+    q.questionNumber++;
+    q.answered = false;
+    q.revealed = false;
+    q.selectedChoice = null;
+    q.isCorrect = null;
+    if (q.mode === "choice") {
+      q.choices = buildChoices(q.current);
+    }
+  }
+
+  function buildChoices(word) {
+    var others = state.words.filter(function (w) { return w.english !== word.english; });
+    var distractors = shuffle(others).slice(0, 3);
+    return shuffle([word].concat(distractors));
+  }
+
+  function requeueCurrent() {
+    var q = state.quiz;
+    var pos = Math.min(q.queue.length, 1 + Math.floor(Math.random() * 3));
+    q.queue.splice(pos, 0, q.current);
+  }
+
+  function submitChoice(englishValue) {
+    var q = state.quiz;
+    if (q.answered) return;
+    q.answered = true;
+    q.selectedChoice = englishValue;
+    q.isCorrect = englishValue === q.current.english;
+    if (q.isCorrect) q.masteredCount++; else requeueCurrent();
+  }
+
+  function flashcardResult(remembered) {
+    var q = state.quiz;
+    if (remembered) q.masteredCount++; else requeueCurrent();
+    advanceQuestion();
+  }
+
+  function setQuizMode(mode) {
+    if (state.quiz.mode === mode) return;
+    state.quiz.mode = mode;
+    startQuizSession();
+  }
+
+  // ---- Views ----
+
+  function renderQuizView() {
+    var q = state.quiz;
+    if (state.words.length === 0) {
+      return '<div class="view quiz-view empty-state">' +
+        '<p>まだ単語が登録されていません。</p>' +
+        '<button class="btn btn-primary" data-action="goto-import">取り込み画面へ</button>' +
+        '</div>';
+    }
+
+    var modeToggle =
+      '<div class="mode-toggle">' +
+      '<button class="mode-btn ' + (q.mode === "choice" ? "active" : "") + '" data-action="set-mode" data-mode="choice">選択式</button>' +
+      '<button class="mode-btn ' + (q.mode === "flashcard" ? "active" : "") + '" data-action="set-mode" data-mode="flashcard">フラッシュカード</button>' +
+      '</div>';
+
+    if (q.finished) {
+      return '<div class="view quiz-view">' + modeToggle +
+        '<div class="card session-complete">' +
+        '<p class="complete-title">🎉 セッション完了！</p>' +
+        '<p>全' + q.totalUnique + '語に正解しました。</p>' +
+        '<button class="btn btn-primary" data-action="restart-quiz">もう一度挑戦する</button>' +
+        '</div></div>';
+    }
+
+    var progressHtml = '<div class="progress-text">正解 ' + q.masteredCount + ' / ' + q.totalUnique + '語　・　第' + q.questionNumber + '問</div>';
+
+    var w = q.current;
+    var questionHtml = "";
+
+    if (q.mode === "choice") {
+      if (!q.answered) {
+        var choiceButtons = q.choices.map(function (c) {
+          return '<button class="choice-btn" data-action="submit-choice" data-value="' + escapeHtml(c.english) + '">' + escapeHtml(c.english) + '</button>';
+        }).join("");
+        questionHtml =
+          '<div class="card question-card">' +
+          '<div class="japanese-text">' + escapeHtml(w.japanese) + '</div>' +
+          '<div class="choices">' + choiceButtons + '</div>' +
+          '</div>';
+      } else {
+        var resultClass = q.isCorrect ? "correct" : "incorrect";
+        var resultText = q.isCorrect ? "✅ 正解！" : ("❌ 不正解（正解: " + escapeHtml(w.english) + "）");
+        questionHtml =
+          '<div class="card question-card">' +
+          '<div class="japanese-text">' + escapeHtml(w.japanese) + '</div>' +
+          '<div class="result-text ' + resultClass + '">' + resultText + '</div>' +
+          '<div class="answer-detail">' +
+          '<div class="english-text">' + escapeHtml(w.english) + '</div>' +
+          '<div class="example-text">' + escapeHtml(w.example) + '</div>' +
+          '<div class="example-ja-text">' + escapeHtml(w.exampleJa) + '</div>' +
+          '</div>' +
+          '<button class="btn btn-primary" data-action="next-question">次の問題へ</button>' +
+          '</div>';
+      }
+    } else {
+      if (!q.revealed) {
+        questionHtml =
+          '<div class="card question-card">' +
+          '<div class="japanese-text">' + escapeHtml(w.japanese) + '</div>' +
+          '<button class="btn btn-primary" data-action="reveal-flashcard">答えを見る</button>' +
+          '</div>';
+      } else {
+        questionHtml =
+          '<div class="card question-card">' +
+          '<div class="japanese-text">' + escapeHtml(w.japanese) + '</div>' +
+          '<div class="answer-detail">' +
+          '<div class="english-text">' + escapeHtml(w.english) + '</div>' +
+          '<div class="example-text">' + escapeHtml(w.example) + '</div>' +
+          '<div class="example-ja-text">' + escapeHtml(w.exampleJa) + '</div>' +
+          '</div>' +
+          '<div class="flashcard-buttons">' +
+          '<button class="btn btn-outline" data-action="flashcard-again">もう一度</button>' +
+          '<button class="btn btn-primary" data-action="flashcard-remembered">覚えた</button>' +
+          '</div>' +
+          '</div>';
+      }
+    }
+
+    return '<div class="view quiz-view">' + modeToggle + progressHtml + questionHtml + '</div>';
+  }
+
+  function wordCardHtml(w) {
+    return '<div class="word-card">' +
+      '<div class="english-text">' + escapeHtml(w.english) + '</div>' +
+      '<div class="japanese-text">' + escapeHtml(w.japanese) + '</div>' +
+      '<div class="example-text">' + escapeHtml(w.example) + '</div>' +
+      '<div class="example-ja-text">' + escapeHtml(w.exampleJa) + '</div>' +
+      '</div>';
+  }
+
+  function renderListView() {
+    return '<div class="view list-view">' +
+      '<div class="search-bar"><input id="search-input" type="search" inputmode="search" placeholder="キーワードで検索" value="' + escapeHtml(state.list.query) + '"></div>' +
+      '<div class="count-text" id="list-count"></div>' +
+      '<div id="list-results"></div>' +
+      '</div>';
+  }
+
+  function updateListResults() {
+    var query = state.list.query.trim().toLowerCase();
+    var filtered = query
+      ? state.words.filter(function (w) {
+          return w.english.toLowerCase().indexOf(query) !== -1 || w.japanese.toLowerCase().indexOf(query) !== -1;
+        })
+      : state.words;
+
+    var countEl = document.getElementById("list-count");
+    var resultsEl = document.getElementById("list-results");
+    if (!countEl || !resultsEl) return;
+
+    countEl.textContent = query
+      ? ("全" + state.words.length + "件中 " + filtered.length + "件を表示")
+      : ("全" + state.words.length + "件");
+
+    resultsEl.innerHTML = filtered.length
+      ? filtered.map(wordCardHtml).join("")
+      : '<p class="empty-msg">該当する単語がありません。</p>';
+  }
+
+  function attachListView() {
+    var input = document.getElementById("search-input");
+    if (!input) return;
+    input.addEventListener("input", function (e) {
+      state.list.query = e.target.value;
+      updateListResults();
+    });
+    updateListResults();
+  }
+
+  function renderImportView() {
+    var sampleJson = escapeHtml(JSON.stringify(SAMPLE_DATA.slice(0, 2), null, 2));
+    return '<div class="view import-view">' +
+      '<section class="card">' +
+      '<h2>① 新しい単語を取り込む</h2>' +
+      '<p class="hint">english / japanese / example / exampleJa の4項目を持つオブジェクトの配列（JSON）を貼り付けてください。<br>※ english が既存の単語と重複する場合はスキップされます（上書きはされません）。</p>' +
+      '<textarea id="import-textarea" rows="8" placeholder=\'[{"english": "...", "japanese": "...", "example": "...", "exampleJa": "..."}]\'></textarea>' +
+      '<button class="btn btn-primary" data-action="import-words">取り込む</button>' +
+      '<div id="import-message" class="message"></div>' +
+      '<details class="example-json">' +
+      '<summary>期待するJSON形式の例を見る</summary>' +
+      '<pre>' + sampleJson + '</pre>' +
+      '</details>' +
+      '</section>' +
+      '<section class="card">' +
+      '<h2>② データのバックアップ・復元</h2>' +
+      '<p class="hint">全単語データをJSONファイルとして書き出したり、書き出したファイルから復元したりできます。復元すると、現在のデータは読み込んだデータで<strong>すべて置き換わります</strong>。</p>' +
+      '<button class="btn btn-secondary" data-action="export-words">エクスポート（書き出し）</button>' +
+      '<label class="btn btn-secondary file-label">インポート（復元）' +
+      '<input type="file" id="restore-file-input" accept="application/json,.json" style="display:none;">' +
+      '</label>' +
+      '<div id="restore-message" class="message"></div>' +
+      '</section>' +
+      '</div>';
+  }
+
+  function handleImportWords() {
+    var textarea = document.getElementById("import-textarea");
+    var msgEl = document.getElementById("import-message");
+    var raw = textarea.value;
+    var parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      msgEl.textContent = "JSONの解析に失敗しました: " + e.message;
+      msgEl.className = "message error";
+      return;
+    }
+    var validation = validateWordArray(parsed);
+    if (!validation.valid) {
+      msgEl.textContent = validation.error;
+      msgEl.className = "message error";
+      return;
+    }
+    var existing = {};
+    state.words.forEach(function (w) { existing[w.english.trim().toLowerCase()] = true; });
+    var added = 0, skipped = 0;
+    validation.words.forEach(function (w) {
+      var key = w.english.trim().toLowerCase();
+      if (existing[key]) { skipped++; return; }
+      existing[key] = true;
+      state.words.push(w);
+      added++;
+    });
+    saveWords(state.words);
+    msgEl.textContent = added + "件追加しました" + (skipped > 0 ? "（" + skipped + "件は重複のためスキップ）" : "") + "。";
+    msgEl.className = "message success";
+    textarea.value = "";
+  }
+
+  function handleExportWords() {
+    var dataStr = JSON.stringify(state.words, null, 2);
+    var blob = new Blob([dataStr], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    var now = new Date();
+    function pad(n) { return n < 10 ? "0" + n : "" + n; }
+    var stamp = now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate());
+    a.href = url;
+    a.download = "vocab-quiz-backup-" + stamp + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    var msgEl = document.getElementById("restore-message");
+    msgEl.textContent = "エクスポートしました（" + state.words.length + "件）。";
+    msgEl.className = "message success";
+  }
+
+  function handleRestoreFile(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      var msgEl = document.getElementById("restore-message");
+      var parsed;
+      try {
+        parsed = JSON.parse(ev.target.result);
+      } catch (err) {
+        msgEl.textContent = "JSONの解析に失敗しました: " + err.message;
+        msgEl.className = "message error";
+        return;
+      }
+      var validation = validateWordArray(parsed, { allowEmpty: true });
+      if (!validation.valid) {
+        msgEl.textContent = validation.error;
+        msgEl.className = "message error";
+        return;
+      }
+      var confirmed = window.confirm(
+        "現在の" + state.words.length + "件のデータを、読み込んだ" + validation.words.length + "件のデータで置き換えます。よろしいですか？"
+      );
+      if (!confirmed) {
+        msgEl.textContent = "復元をキャンセルしました。";
+        msgEl.className = "message";
+        return;
+      }
+      state.words = validation.words;
+      saveWords(state.words);
+      startQuizSession();
+      msgEl.textContent = validation.words.length + "件のデータで復元しました。";
+      msgEl.className = "message success";
+      e.target.value = "";
+    };
+    reader.readAsText(file);
+  }
+
+  // ---- Router / render ----
+
+  function viewHtml() {
+    if (state.view === "quiz") return renderQuizView();
+    if (state.view === "list") return renderListView();
+    if (state.view === "import") return renderImportView();
+    return "";
+  }
+
+  function render() {
+    var app = document.getElementById("app");
+    app.innerHTML =
+      '<header class="app-header"><h1>英単語クイズ</h1></header>' +
+      '<main class="app-main">' + viewHtml() + '</main>' +
+      '<nav class="bottom-nav">' +
+      '<button class="nav-btn ' + (state.view === "quiz" ? "active" : "") + '" data-action="nav" data-view="quiz"><span class="nav-icon">📝</span><span>クイズ</span></button>' +
+      '<button class="nav-btn ' + (state.view === "list" ? "active" : "") + '" data-action="nav" data-view="list"><span class="nav-icon">📋</span><span>一覧</span></button>' +
+      '<button class="nav-btn ' + (state.view === "import" ? "active" : "") + '" data-action="nav" data-view="import"><span class="nav-icon">📥</span><span>取り込み</span></button>' +
+      '</nav>';
+    if (state.view === "list") attachListView();
+  }
+
+  function setView(view) {
+    state.view = view;
+    render();
+  }
+
+  document.addEventListener("click", function (e) {
+    var target = e.target.closest("[data-action]");
+    if (!target) return;
+    var action = target.dataset.action;
+    switch (action) {
+      case "nav": setView(target.dataset.view); return;
+      case "goto-import": setView("import"); return;
+      case "restart-quiz": startQuizSession(); render(); return;
+      case "set-mode": setQuizMode(target.dataset.mode); render(); return;
+      case "submit-choice": submitChoice(target.dataset.value); render(); return;
+      case "next-question": advanceQuestion(); render(); return;
+      case "reveal-flashcard": state.quiz.revealed = true; render(); return;
+      case "flashcard-again": flashcardResult(false); render(); return;
+      case "flashcard-remembered": flashcardResult(true); render(); return;
+      case "import-words": handleImportWords(); return;
+      case "export-words": handleExportWords(); return;
+    }
+  });
+
+  document.addEventListener("change", function (e) {
+    if (e.target && e.target.id === "restore-file-input") {
+      handleRestoreFile(e);
+    }
+  });
+
+  function init() {
+    try {
+      state.words = loadWords();
+      startQuizSession();
+      render();
+    } catch (e) {
+      document.getElementById("app").innerHTML =
+        '<div style="padding:40px 20px;text-align:center;color:#d1555c;line-height:1.6;">' +
+        '読み込み中にエラーが発生しました。<br>' + escapeHtml(e && e.message ? e.message : String(e)) +
+        '</div>';
+    }
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
