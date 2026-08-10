@@ -112,7 +112,22 @@
 </head>
 <body>
 <div id="app"></div>
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+
+var firebaseConfig = {
+  apiKey: "AIzaSyA_cK2EZobBh8iRMYCL0WbtTPFWwr9iUrU",
+  authDomain: "vocab-quiz-3291.firebaseapp.com",
+  projectId: "vocab-quiz-3291",
+  storageBucket: "vocab-quiz-3291.firebasestorage.app",
+  messagingSenderId: "206018797680",
+  appId: "1:206018797680:web:cc4d2438304282869594b5"
+};
+var firebaseApp = initializeApp(firebaseConfig);
+var db = getFirestore(firebaseApp);
+var wordsDocRef = doc(db, "vocabQuiz", "shared");
+
 (function(){
   "use strict";
 
@@ -179,42 +194,62 @@
     }
   })();
 
-  function loadWords() {
-    if (!hasStorage) {
-      memoryWords = SAMPLE_DATA.slice();
-      return memoryWords;
-    }
-    var raw;
+  function loadCachedWords() {
+    if (!hasStorage) return memoryWords;
     try {
-      raw = localStorage.getItem(STORAGE_KEY);
-    } catch (e) {
-      hasStorage = false;
-      memoryWords = SAMPLE_DATA.slice();
-      return memoryWords;
-    }
-    if (raw === null) {
-      saveWords(SAMPLE_DATA);
-      return SAMPLE_DATA.slice();
-    }
-    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw === null) return null;
       var parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      return Array.isArray(parsed) ? parsed : null;
     } catch (e) {
-      return [];
+      return null;
     }
   }
 
-  function saveWords(words) {
-    if (!hasStorage) {
-      memoryWords = words;
-      return;
-    }
+  function cacheWordsLocally(words) {
+    memoryWords = words;
+    if (!hasStorage) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
     } catch (e) {
       hasStorage = false;
-      memoryWords = words;
     }
+  }
+
+  // ---- Cloud sync (Firestore) ----
+  // Words live in a single shared document so any device sees the same list.
+  // localStorage is kept only as an instant-paint / offline cache.
+
+  function applyRemoteWords(words) {
+    state.words = words;
+    cacheWordsLocally(words);
+    if (state.view === "list") {
+      updateListResults();
+    } else if (state.view === "quiz" && (state.quiz.finished || state.quiz.totalUnique === 0)) {
+      startQuizSession();
+      render();
+    }
+  }
+
+  function pushWordsUpdate(words, onSuccess, onError) {
+    cacheWordsLocally(words);
+    setDoc(wordsDocRef, { words: words }).then(onSuccess, function (e) {
+      if (onError) onError(e);
+    });
+  }
+
+  function subscribeToWords() {
+    onSnapshot(wordsDocRef, function (snap) {
+      if (snap.exists() && Array.isArray(snap.data().words)) {
+        applyRemoteWords(snap.data().words);
+      } else {
+        setDoc(wordsDocRef, { words: SAMPLE_DATA }).catch(function (e) {
+          console.error("Failed to seed shared word list:", e);
+        });
+      }
+    }, function (error) {
+      console.error("Firestore sync error (staying on local/cached data):", error);
+    });
   }
 
   function validateWordArray(data, opts) {
@@ -502,9 +537,15 @@
       state.words.push(w);
       added++;
     });
-    saveWords(state.words);
-    msgEl.textContent = added + "件追加しました" + (skipped > 0 ? "（" + skipped + "件は重複のためスキップ）" : "") + "。";
-    msgEl.className = "message success";
+    msgEl.textContent = "同期中...";
+    msgEl.className = "message";
+    pushWordsUpdate(state.words, function () {
+      msgEl.textContent = added + "件追加しました" + (skipped > 0 ? "（" + skipped + "件は重複のためスキップ）" : "") + "。他の端末にも反映されます。";
+      msgEl.className = "message success";
+    }, function (e) {
+      msgEl.textContent = "この端末には追加されましたが、オンライン同期に失敗しました（" + e.message + "）。ネットワーク接続をご確認ください。";
+      msgEl.className = "message error";
+    });
     textarea.value = "";
   }
 
@@ -556,10 +597,16 @@
         return;
       }
       state.words = validation.words;
-      saveWords(state.words);
       startQuizSession();
-      msgEl.textContent = validation.words.length + "件のデータで復元しました。";
-      msgEl.className = "message success";
+      msgEl.textContent = "同期中...";
+      msgEl.className = "message";
+      pushWordsUpdate(state.words, function () {
+        msgEl.textContent = validation.words.length + "件のデータで復元しました。他の端末にも反映されます。";
+        msgEl.className = "message success";
+      }, function (err2) {
+        msgEl.textContent = "この端末には復元されましたが、オンライン同期に失敗しました（" + err2.message + "）。ネットワーク接続をご確認ください。";
+        msgEl.className = "message error";
+      });
       e.target.value = "";
     };
     reader.readAsText(file);
@@ -619,9 +666,10 @@
 
   function init() {
     try {
-      state.words = loadWords();
+      state.words = loadCachedWords() || [];
       startQuizSession();
       render();
+      subscribeToWords();
     } catch (e) {
       document.getElementById("app").innerHTML =
         '<div style="padding:40px 20px;text-align:center;color:#d1555c;line-height:1.6;">' +
