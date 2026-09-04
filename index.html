@@ -92,11 +92,32 @@
   .search-bar input { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--color-border); background: #fff; }
   .count-text { font-size: 0.8rem; color: var(--color-text-muted); text-align: right; }
   .word-card { background: #fff; border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(20,30,50,0.05); }
+  .pos-badge { display: inline-block; font-size: 0.7rem; font-weight: 700; color: var(--color-primary); background: #eef2f7; padding: 2px 8px; border-radius: 999px; margin-bottom: 6px; }
+  .filter-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .filter-chip { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--color-border); background: #fff; font-size: 0.82rem; font-weight: 600; color: var(--color-text-muted); min-height: 32px; }
+  .filter-chip.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+  .filter-chip.chip-letter { padding: 6px 10px; min-width: 30px; text-align: center; }
+  .list-group-header { font-size: 0.8rem; font-weight: 700; color: var(--color-primary-dark); background: #eef2f7; padding: 6px 10px; border-radius: 8px; }
   .word-card .english-text { font-size: 1.15rem; margin-bottom: 4px; }
   .word-card .japanese-text { font-size: 0.95rem; font-weight: 500; color: var(--color-text); margin-bottom: 0; }
   .word-card .example-text { margin-top: 8px; }
   #list-results { display: flex; flex-direction: column; gap: 10px; }
   .empty-msg { text-align: center; color: var(--color-text-muted); padding: 30px 0; }
+
+  .stats-numbers { display: flex; justify-content: space-around; margin-top: 10px; }
+  .stat-item { text-align: center; }
+  .stat-value { font-size: 1.4rem; font-weight: 700; color: var(--color-primary-dark); }
+  .stat-label { font-size: 0.75rem; color: var(--color-text-muted); margin-top: 2px; }
+  .weak-word-list { display: flex; flex-direction: column; gap: 0; margin-top: 10px; }
+  .weak-word-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--color-border); }
+  .weak-word-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .weak-word-rank { width: 20px; text-align: center; font-weight: 700; color: var(--color-text-muted); flex-shrink: 0; }
+  .weak-word-main { flex: 1; min-width: 0; }
+  .weak-word-main .english-text { font-size: 1rem; margin-bottom: 2px; }
+  .weak-word-main .japanese-text { font-size: 0.85rem; margin-bottom: 0; }
+  .weak-word-count { text-align: right; flex-shrink: 0; }
+  .weak-word-wrong { font-size: 0.9rem; font-weight: 700; color: var(--color-error); }
+  .weak-word-acc { font-size: 0.72rem; color: var(--color-text-muted); margin-top: 2px; }
 
   textarea { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--color-border); resize: vertical; }
   .hint { font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.6; margin: 6px 0 12px; }
@@ -127,23 +148,26 @@ var firebaseConfig = {
 var firebaseApp = initializeApp(firebaseConfig);
 var db = getFirestore(firebaseApp);
 var wordsDocRef = doc(db, "vocabQuiz", "shared");
+var statsDocRef = doc(db, "vocabQuiz", "stats");
 
 (function(){
   "use strict";
 
   var STORAGE_KEY = "vocabQuizWords_v1";
+  var STATS_STORAGE_KEY = "vocabQuizStats_v1";
 
   var SAMPLE_DATA = [
-    { english: "get the hang of", japanese: "コツをつかむ", example: "It took me a while to get the hang of the new system.", exampleJa: "新しいシステムのコツをつかむのに少し時間がかかった。" },
-    { english: "on the fence", japanese: "決めかねている、迷っている", example: "I'm still on the fence about which job offer to accept.", exampleJa: "どちらの内定を受けるかまだ迷っている。" },
-    { english: "procrastinate", japanese: "先延ばしにする", example: "I always procrastinate when it comes to doing my taxes.", exampleJa: "確定申告のことになるといつも先延ばしにしてしまう。" },
-    { english: "a piece of cake", japanese: "とても簡単なこと", example: "Don't worry, the exam was a piece of cake.", exampleJa: "心配しないで、その試験はとても簡単だった。" },
-    { english: "make ends meet", japanese: "生活をやりくりする、収支を合わせる", example: "It's hard to make ends meet with rising prices.", exampleJa: "物価上昇でやりくりするのは大変だ。" }
+    { english: "get the hang of", japanese: "コツをつかむ", example: "It took me a while to get the hang of the new system.", exampleJa: "新しいシステムのコツをつかむのに少し時間がかかった。", pos: "イディオム" },
+    { english: "on the fence", japanese: "決めかねている、迷っている", example: "I'm still on the fence about which job offer to accept.", exampleJa: "どちらの内定を受けるかまだ迷っている。", pos: "イディオム" },
+    { english: "procrastinate", japanese: "先延ばしにする", example: "I always procrastinate when it comes to doing my taxes.", exampleJa: "確定申告のことになるといつも先延ばしにしてしまう。", pos: "動詞" },
+    { english: "a piece of cake", japanese: "とても簡単なこと", example: "Don't worry, the exam was a piece of cake.", exampleJa: "心配しないで、その試験はとても簡単だった。", pos: "イディオム" },
+    { english: "make ends meet", japanese: "生活をやりくりする、収支を合わせる", example: "It's hard to make ends meet with rising prices.", exampleJa: "物価上昇でやりくりするのは大変だ。", pos: "イディオム" }
   ];
 
   var state = {
     view: "quiz",
     words: [],
+    stats: { perWord: {} },
     quiz: {
       mode: "choice",
       queue: [],
@@ -158,7 +182,7 @@ var wordsDocRef = doc(db, "vocabQuiz", "shared");
       revealed: false,
       finished: false
     },
-    list: { query: "" }
+    list: { query: "", sort: "default", posFilter: "", letterFilter: "" }
   };
 
   function escapeHtml(str) {
@@ -216,6 +240,30 @@ var wordsDocRef = doc(db, "vocabQuiz", "shared");
     }
   }
 
+  var memoryStats = null;
+
+  function loadCachedStats() {
+    if (!hasStorage) return memoryStats;
+    try {
+      var raw = localStorage.getItem(STATS_STORAGE_KEY);
+      if (raw === null) return null;
+      var parsed = JSON.parse(raw);
+      return (parsed && typeof parsed === "object" && parsed.perWord) ? parsed : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function cacheStatsLocally(stats) {
+    memoryStats = stats;
+    if (!hasStorage) return;
+    try {
+      localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(stats));
+    } catch (e) {
+      hasStorage = false;
+    }
+  }
+
   // ---- Cloud sync (Firestore) ----
   // Words live in a single shared document so any device sees the same list.
   // localStorage is kept only as an instant-paint / offline cache.
@@ -252,6 +300,43 @@ var wordsDocRef = doc(db, "vocabQuiz", "shared");
     });
   }
 
+  function applyRemoteStats(stats) {
+    state.stats = stats;
+    cacheStatsLocally(stats);
+    if (state.view === "stats") render();
+  }
+
+  function pushStatsUpdate(stats, onSuccess, onError) {
+    cacheStatsLocally(stats);
+    setDoc(statsDocRef, stats).then(onSuccess, function (e) {
+      if (onError) onError(e);
+    });
+  }
+
+  function subscribeToStats() {
+    onSnapshot(statsDocRef, function (snap) {
+      if (snap.exists() && snap.data().perWord) {
+        applyRemoteStats(snap.data());
+      } else {
+        setDoc(statsDocRef, { perWord: {} }).catch(function (e) {
+          console.error("Failed to seed shared stats:", e);
+        });
+      }
+    }, function (error) {
+      console.error("Firestore stats sync error (staying on local/cached data):", error);
+    });
+  }
+
+  function recordAnswer(word, correct) {
+    var key = word.english.trim().toLowerCase();
+    var perWord = state.stats.perWord || (state.stats.perWord = {});
+    var entry = perWord[key] || (perWord[key] = { correct: 0, incorrect: 0 });
+    if (correct) entry.correct++; else entry.incorrect++;
+    pushStatsUpdate(state.stats, null, function (e) {
+      console.error("Failed to sync stats:", e);
+    });
+  }
+
   function validateWordArray(data, opts) {
     opts = opts || {};
     if (!Array.isArray(data)) {
@@ -274,12 +359,14 @@ var wordsDocRef = doc(db, "vocabQuiz", "shared");
       }
     }
     var words = data.map(function (item) {
-      return {
+      var word = {
         english: item.english.trim(),
         japanese: item.japanese.trim(),
         example: item.example.trim(),
         exampleJa: item.exampleJa.trim()
       };
+      if (typeof item.pos === "string" && item.pos.trim() !== "") word.pos = item.pos.trim();
+      return word;
     });
     return { valid: true, words: words };
   }
@@ -338,11 +425,13 @@ var wordsDocRef = doc(db, "vocabQuiz", "shared");
     q.selectedChoice = englishValue;
     q.isCorrect = englishValue === q.current.english;
     if (q.isCorrect) q.masteredCount++; else requeueCurrent();
+    recordAnswer(q.current, q.isCorrect);
   }
 
   function flashcardResult(remembered) {
     var q = state.quiz;
     if (remembered) q.masteredCount++; else requeueCurrent();
+    recordAnswer(q.current, remembered);
     advanceQuestion();
   }
 
@@ -435,8 +524,80 @@ var wordsDocRef = doc(db, "vocabQuiz", "shared");
     return '<div class="view quiz-view">' + modeToggle + progressHtml + questionHtml + '</div>';
   }
 
+  var POS_ORDER = ["動詞", "句動詞", "イディオム", "名詞", "形容詞", "副詞", "前置詞", "接続詞"];
+  var POS_UNSET_LABEL = "品詞未設定";
+
+  function posGroupRank(pos) {
+    if (!pos) return POS_ORDER.length + 1;
+    var idx = POS_ORDER.indexOf(pos);
+    return idx === -1 ? POS_ORDER.length : idx;
+  }
+
+  function groupWordsByPos(words) {
+    var groups = {};
+    words.forEach(function (w) {
+      var key = w.pos && w.pos.trim() ? w.pos.trim() : "";
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(w);
+    });
+    var keys = Object.keys(groups).sort(function (a, b) {
+      var ra = posGroupRank(a), rb = posGroupRank(b);
+      if (ra !== rb) return ra - rb;
+      return a.localeCompare(b, "ja");
+    });
+    return keys.map(function (key) {
+      var list = groups[key].slice().sort(function (a, b) {
+        return a.english.toLowerCase().localeCompare(b.english.toLowerCase());
+      });
+      return { label: key || POS_UNSET_LABEL, words: list };
+    });
+  }
+
+  function getAvailablePosFilters() {
+    var set = {};
+    var hasUnset = false;
+    state.words.forEach(function (w) {
+      if (w.pos && w.pos.trim()) set[w.pos.trim()] = true;
+      else hasUnset = true;
+    });
+    var keys = Object.keys(set).sort(function (a, b) {
+      var ra = posGroupRank(a), rb = posGroupRank(b);
+      if (ra !== rb) return ra - rb;
+      return a.localeCompare(b, "ja");
+    });
+    if (hasUnset) keys.push(POS_UNSET_LABEL);
+    return keys;
+  }
+
+  function matchesPosFilter(w, filterValue) {
+    if (!filterValue) return true;
+    if (filterValue === POS_UNSET_LABEL) return !w.pos || !w.pos.trim();
+    return !!w.pos && w.pos.trim() === filterValue;
+  }
+
+  function startingLetter(w) {
+    var ch = (w.english || "").trim().charAt(0).toUpperCase();
+    return /[A-Z]/.test(ch) ? ch : "#";
+  }
+
+  function getAvailableLetterFilters() {
+    var set = {};
+    state.words.forEach(function (w) { set[startingLetter(w)] = true; });
+    return Object.keys(set).sort(function (a, b) {
+      if (a === "#") return 1;
+      if (b === "#") return -1;
+      return a.localeCompare(b);
+    });
+  }
+
+  function matchesLetterFilter(w, filterValue) {
+    if (!filterValue) return true;
+    return startingLetter(w) === filterValue;
+  }
+
   function wordCardHtml(w) {
     return '<div class="word-card">' +
+      (w.pos ? '<div class="pos-badge">' + escapeHtml(w.pos) + '</div>' : '') +
       '<div class="english-text">' + escapeHtml(w.english) + '</div>' +
       '<div class="japanese-text">' + escapeHtml(w.japanese) + '</div>' +
       '<div class="example-text">' + escapeHtml(w.example) + '</div>' +
@@ -445,8 +606,37 @@ var wordsDocRef = doc(db, "vocabQuiz", "shared");
   }
 
   function renderListView() {
+    var chipsHtml = "";
+    if (state.list.sort === "pos") {
+      var filterChips = getAvailablePosFilters();
+      chipsHtml = '<div class="filter-chips">' +
+        '<button class="filter-chip ' + (!state.list.posFilter ? "active" : "") + '" data-action="set-list-filter" data-filter="">すべて</button>' +
+        filterChips.map(function (label) {
+          return '<button class="filter-chip ' + (state.list.posFilter === label ? "active" : "") + '" data-action="set-list-filter" data-filter="' + escapeHtml(label) + '">' + escapeHtml(label) + '</button>';
+        }).join("") +
+        '</div>';
+    }
+
+    var letterChipsHtml = "";
+    if (state.list.sort === "alpha") {
+      var letters = getAvailableLetterFilters();
+      letterChipsHtml = '<div class="filter-chips">' +
+        '<button class="filter-chip chip-letter ' + (!state.list.letterFilter ? "active" : "") + '" data-action="set-list-letter" data-letter="">すべて</button>' +
+        letters.map(function (ch) {
+          return '<button class="filter-chip chip-letter ' + (state.list.letterFilter === ch ? "active" : "") + '" data-action="set-list-letter" data-letter="' + escapeHtml(ch) + '">' + escapeHtml(ch) + '</button>';
+        }).join("") +
+        '</div>';
+    }
+
     return '<div class="view list-view">' +
       '<div class="search-bar"><input id="search-input" type="search" inputmode="search" placeholder="キーワードで検索" value="' + escapeHtml(state.list.query) + '"></div>' +
+      '<div class="mode-toggle">' +
+      '<button class="mode-btn ' + (state.list.sort === "default" ? "active" : "") + '" data-action="set-list-sort" data-sort="default">登録順</button>' +
+      '<button class="mode-btn ' + (state.list.sort === "alpha" ? "active" : "") + '" data-action="set-list-sort" data-sort="alpha">ABC順</button>' +
+      '<button class="mode-btn ' + (state.list.sort === "pos" ? "active" : "") + '" data-action="set-list-sort" data-sort="pos">品詞順</button>' +
+      '</div>' +
+      chipsHtml +
+      letterChipsHtml +
       '<div class="count-text" id="list-count"></div>' +
       '<div id="list-results"></div>' +
       '</div>';
@@ -454,23 +644,38 @@ var wordsDocRef = doc(db, "vocabQuiz", "shared");
 
   function updateListResults() {
     var query = state.list.query.trim().toLowerCase();
+    var posFilter = state.list.sort === "pos" ? state.list.posFilter : "";
+    var letterFilter = state.list.sort === "alpha" ? state.list.letterFilter : "";
+    var byFilter = state.words.filter(function (w) { return matchesPosFilter(w, posFilter) && matchesLetterFilter(w, letterFilter); });
     var filtered = query
-      ? state.words.filter(function (w) {
+      ? byFilter.filter(function (w) {
           return w.english.toLowerCase().indexOf(query) !== -1 || w.japanese.toLowerCase().indexOf(query) !== -1;
         })
-      : state.words;
+      : byFilter;
 
     var countEl = document.getElementById("list-count");
     var resultsEl = document.getElementById("list-results");
     if (!countEl || !resultsEl) return;
 
     countEl.textContent = query
-      ? ("全" + state.words.length + "件中 " + filtered.length + "件を表示")
-      : ("全" + state.words.length + "件");
+      ? ("全" + byFilter.length + "件中 " + filtered.length + "件を表示")
+      : ("全" + byFilter.length + "件");
 
-    resultsEl.innerHTML = filtered.length
-      ? filtered.map(wordCardHtml).join("")
-      : '<p class="empty-msg">該当する単語がありません。</p>';
+    if (!filtered.length) {
+      resultsEl.innerHTML = '<p class="empty-msg">該当する単語がありません。</p>';
+    } else if (state.list.sort === "pos") {
+      resultsEl.innerHTML = groupWordsByPos(filtered).map(function (g) {
+        return '<div class="list-group-header">' + escapeHtml(g.label) + '（' + g.words.length + '）</div>' +
+          g.words.map(wordCardHtml).join("");
+      }).join("");
+    } else if (state.list.sort === "alpha") {
+      var sorted = filtered.slice().sort(function (a, b) {
+        return a.english.toLowerCase().localeCompare(b.english.toLowerCase());
+      });
+      resultsEl.innerHTML = sorted.map(wordCardHtml).join("");
+    } else {
+      resultsEl.innerHTML = filtered.map(wordCardHtml).join("");
+    }
   }
 
   function attachListView() {
@@ -483,12 +688,72 @@ var wordsDocRef = doc(db, "vocabQuiz", "shared");
     updateListResults();
   }
 
+  function renderStatsView() {
+    var perWord = state.stats.perWord || {};
+    var totalCorrect = 0, totalIncorrect = 0;
+    Object.keys(perWord).forEach(function (k) {
+      totalCorrect += perWord[k].correct || 0;
+      totalIncorrect += perWord[k].incorrect || 0;
+    });
+    var totalAttempts = totalCorrect + totalIncorrect;
+    var accuracy = totalAttempts > 0 ? Math.round((totalCorrect / totalAttempts) * 100) : 0;
+
+    var summaryHtml = '<div class="card stats-summary">' +
+      '<h2>学習サマリー</h2>' +
+      (totalAttempts > 0
+        ? '<div class="stats-numbers">' +
+          '<div class="stat-item"><div class="stat-value">' + totalAttempts + '</div><div class="stat-label">出題数</div></div>' +
+          '<div class="stat-item"><div class="stat-value">' + totalCorrect + '</div><div class="stat-label">正答数</div></div>' +
+          '<div class="stat-item"><div class="stat-value">' + accuracy + '%</div><div class="stat-label">正答率</div></div>' +
+          '</div>'
+        : '<p class="hint">まだ学習記録がありません。クイズに挑戦してみましょう。</p>') +
+      '</div>';
+
+    var wordByKey = {};
+    state.words.forEach(function (w) { wordByKey[w.english.trim().toLowerCase()] = w; });
+
+    var ranking = Object.keys(perWord)
+      .filter(function (k) { return wordByKey[k] && (perWord[k].incorrect || 0) > 0; })
+      .map(function (k) {
+        var s = perWord[k];
+        var attempts = (s.correct || 0) + (s.incorrect || 0);
+        return {
+          word: wordByKey[k],
+          incorrect: s.incorrect || 0,
+          accuracy: attempts ? Math.round(((s.correct || 0) / attempts) * 100) : 0
+        };
+      })
+      .sort(function (a, b) { return b.incorrect - a.incorrect; })
+      .slice(0, 10);
+
+    var rankingHtml = '<div class="card">' +
+      '<h2>苦手な単語ランキング</h2>' +
+      (ranking.length
+        ? '<div class="weak-word-list">' + ranking.map(function (r, i) {
+            return '<div class="weak-word-row">' +
+              '<div class="weak-word-rank">' + (i + 1) + '</div>' +
+              '<div class="weak-word-main">' +
+              '<div class="english-text">' + escapeHtml(r.word.english) + '</div>' +
+              '<div class="japanese-text">' + escapeHtml(r.word.japanese) + '</div>' +
+              '</div>' +
+              '<div class="weak-word-count">' +
+              '<div class="weak-word-wrong">✕' + r.incorrect + '</div>' +
+              '<div class="weak-word-acc">正答率' + r.accuracy + '%</div>' +
+              '</div>' +
+              '</div>';
+          }).join("") + '</div>'
+        : '<p class="hint">間違えた単語はまだありません。</p>') +
+      '</div>';
+
+    return '<div class="view stats-view">' + summaryHtml + rankingHtml + '</div>';
+  }
+
   function renderImportView() {
     var sampleJson = escapeHtml(JSON.stringify(SAMPLE_DATA.slice(0, 2), null, 2));
     return '<div class="view import-view">' +
       '<section class="card">' +
       '<h2>① 新しい単語を取り込む</h2>' +
-      '<p class="hint">english / japanese / example / exampleJa の4項目を持つオブジェクトの配列（JSON）を貼り付けてください。<br>※ english が既存の単語と重複する場合はスキップされます（上書きはされません）。</p>' +
+      '<p class="hint">english / japanese / example / exampleJa の4項目（必須）を持つオブジェクトの配列（JSON）を貼り付けてください。任意で pos（品詞：動詞・名詞・形容詞・副詞・イディオムなど）も指定すると、一覧画面で品詞順に並べ替えられます。<br>※ english が既存の単語と重複する場合はスキップされます（上書きはされません）。</p>' +
       '<textarea id="import-textarea" rows="8" placeholder=\'[{"english": "...", "japanese": "...", "example": "...", "exampleJa": "..."}]\'></textarea>' +
       '<button class="btn btn-primary" data-action="import-words">取り込む</button>' +
       '<div id="import-message" class="message"></div>' +
@@ -617,6 +882,7 @@ var wordsDocRef = doc(db, "vocabQuiz", "shared");
   function viewHtml() {
     if (state.view === "quiz") return renderQuizView();
     if (state.view === "list") return renderListView();
+    if (state.view === "stats") return renderStatsView();
     if (state.view === "import") return renderImportView();
     return "";
   }
@@ -629,6 +895,7 @@ var wordsDocRef = doc(db, "vocabQuiz", "shared");
       '<nav class="bottom-nav">' +
       '<button class="nav-btn ' + (state.view === "quiz" ? "active" : "") + '" data-action="nav" data-view="quiz"><span class="nav-icon">📝</span><span>クイズ</span></button>' +
       '<button class="nav-btn ' + (state.view === "list" ? "active" : "") + '" data-action="nav" data-view="list"><span class="nav-icon">📋</span><span>一覧</span></button>' +
+      '<button class="nav-btn ' + (state.view === "stats" ? "active" : "") + '" data-action="nav" data-view="stats"><span class="nav-icon">📊</span><span>統計</span></button>' +
       '<button class="nav-btn ' + (state.view === "import" ? "active" : "") + '" data-action="nav" data-view="import"><span class="nav-icon">📥</span><span>取り込み</span></button>' +
       '</nav>';
     if (state.view === "list") attachListView();
@@ -648,6 +915,9 @@ var wordsDocRef = doc(db, "vocabQuiz", "shared");
       case "goto-import": setView("import"); return;
       case "restart-quiz": startQuizSession(); render(); return;
       case "set-mode": setQuizMode(target.dataset.mode); render(); return;
+      case "set-list-sort": state.list.sort = target.dataset.sort; render(); return;
+      case "set-list-filter": state.list.posFilter = target.dataset.filter; render(); return;
+      case "set-list-letter": state.list.letterFilter = target.dataset.letter; render(); return;
       case "submit-choice": submitChoice(target.dataset.value); render(); return;
       case "next-question": advanceQuestion(); render(); return;
       case "reveal-flashcard": state.quiz.revealed = true; render(); return;
@@ -667,9 +937,11 @@ var wordsDocRef = doc(db, "vocabQuiz", "shared");
   function init() {
     try {
       state.words = loadCachedWords() || [];
+      state.stats = loadCachedStats() || { perWord: {} };
       startQuizSession();
       render();
       subscribeToWords();
+      subscribeToStats();
     } catch (e) {
       document.getElementById("app").innerHTML =
         '<div style="padding:40px 20px;text-align:center;color:#d1555c;line-height:1.6;">' +
