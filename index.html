@@ -59,9 +59,10 @@
   .btn-primary:active { background: var(--color-primary-dark); }
   .btn-secondary { background: #eef2f7; color: var(--color-primary-dark); }
   .btn-outline { background: #fff; border: 1px solid var(--color-border); color: var(--color-text); }
+  .btn:disabled { opacity: 0.4; cursor: default; }
 
   .mode-toggle { display: flex; background: #eef1f5; border-radius: 10px; padding: 4px; }
-  .mode-btn { flex: 1; border: none; background: none; padding: 10px 0; border-radius: 8px; font-size: 0.9rem; font-weight: 600; color: var(--color-text-muted); min-height: 40px; }
+  .mode-btn { flex: 1; border: none; background: none; padding: 10px 2px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; color: var(--color-text-muted); min-height: 40px; white-space: nowrap; }
   .mode-btn.active { background: #fff; color: var(--color-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
 
   .progress-text { text-align: center; font-size: 0.85rem; color: var(--color-text-muted); }
@@ -81,8 +82,23 @@
   .result-text.incorrect { color: var(--color-error); }
   .answer-detail { border-top: 1px solid var(--color-border); margin-top: 14px; padding-top: 14px; }
 
+  .extra-details { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--color-border); text-align: left; }
+  .extra-item { font-size: 0.82rem; color: var(--color-text); margin-top: 6px; line-height: 1.5; }
+  .extra-item:first-child { margin-top: 0; }
+  .extra-label { display: inline-block; font-size: 0.68rem; font-weight: 700; color: var(--color-primary); background: #eef2f7; padding: 1px 6px; border-radius: 999px; margin-right: 6px; vertical-align: middle; }
+
   .flashcard-buttons { display: flex; gap: 10px; margin-top: 6px; }
   .flashcard-buttons .btn { margin-top: 0; }
+
+  .arrange-hint { font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 4px; }
+  .arrange-answer-area { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 8px; justify-content: flex-start; min-height: 52px; padding: 10px; border: 1px dashed var(--color-border); border-radius: 10px; margin: 14px 0; text-align: left; }
+  .arrange-slot-placeholder { font-size: 0.85rem; color: var(--color-text-muted); }
+  .arrange-slot-btn { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--color-primary); background: #eef2f7; color: var(--color-primary-dark); font-weight: 600; font-size: 0.95rem; min-height: 40px; }
+  .arrange-token-area { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 14px; }
+  .arrange-token-btn { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--color-border); background: #fff; color: var(--color-text); font-weight: 600; font-size: 0.95rem; min-height: 40px; }
+  .arrange-token-btn:active { background: #eef2f7; }
+  .arrange-controls { display: flex; gap: 10px; }
+  .arrange-controls .btn { margin-top: 0; }
 
   .session-complete { text-align: center; }
   .complete-title { font-size: 1.3rem; margin-bottom: 6px; }
@@ -157,7 +173,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
   var STATS_STORAGE_KEY = "vocabQuizStats_v1";
 
   var SAMPLE_DATA = [
-    { english: "get the hang of", japanese: "コツをつかむ", example: "It took me a while to get the hang of the new system.", exampleJa: "新しいシステムのコツをつかむのに少し時間がかかった。", pos: "イディオム" },
+    { english: "get the hang of", japanese: "コツをつかむ", example: "It took me a while to get the hang of the new system.", exampleJa: "新しいシステムのコツをつかむのに少し時間がかかった。", pos: "イディオム", etymology: "「hang」はもともと「（物の）扱い方のクセ」を指す口語表現。", nuance: "\"learn\" よりくだけた言い方で、体で覚える感覚が強い。", related: "get a feel for（感覚をつかむ）、get used to（慣れる）" },
     { english: "on the fence", japanese: "決めかねている、迷っている", example: "I'm still on the fence about which job offer to accept.", exampleJa: "どちらの内定を受けるかまだ迷っている。", pos: "イディオム" },
     { english: "procrastinate", japanese: "先延ばしにする", example: "I always procrastinate when it comes to doing my taxes.", exampleJa: "確定申告のことになるといつも先延ばしにしてしまう。", pos: "動詞" },
     { english: "a piece of cake", japanese: "とても簡単なこと", example: "Don't worry, the exam was a piece of cake.", exampleJa: "心配しないで、その試験はとても簡単だった。", pos: "イディオム" },
@@ -180,7 +196,10 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       isCorrect: null,
       choices: [],
       revealed: false,
-      finished: false
+      finished: false,
+      arrangeTokens: [],
+      arrangeOrder: [],
+      arrangeSelected: []
     },
     list: { query: "", sort: "default", posFilter: "", letterFilter: "" }
   };
@@ -197,6 +216,14 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     });
   }
 
+  function extraDetailsHtml(w) {
+    var parts = [];
+    if (w.etymology) parts.push('<div class="extra-item"><span class="extra-label">語源</span>' + escapeHtml(w.etymology) + '</div>');
+    if (w.nuance) parts.push('<div class="extra-item"><span class="extra-label">ニュアンス</span>' + escapeHtml(w.nuance) + '</div>');
+    if (w.related) parts.push('<div class="extra-item"><span class="extra-label">関連</span>' + escapeHtml(w.related) + '</div>');
+    return parts.length ? '<div class="extra-details">' + parts.join("") + '</div>' : "";
+  }
+
   function shuffle(arr) {
     var a = arr.slice();
     for (var i = a.length - 1; i > 0; i--) {
@@ -204,6 +231,25 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
     }
     return a;
+  }
+
+  function tokenizeExample(example) {
+    return example.trim().split(/\s+/).map(function (text, idx) {
+      return { id: idx, text: text };
+    });
+  }
+
+  function shuffleTokenOrder(tokens) {
+    var ids = tokens.map(function (t) { return t.id; });
+    if (ids.length < 2) return ids;
+    var original = ids.join(",");
+    var shuffled = ids;
+    var attempts = 0;
+    do {
+      shuffled = shuffle(ids);
+      attempts++;
+    } while (shuffled.join(",") === original && attempts < 8);
+    return shuffled;
   }
 
   var memoryWords = null;
@@ -290,7 +336,9 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     onSnapshot(wordsDocRef, function (snap) {
       if (snap.exists() && Array.isArray(snap.data().words)) {
         applyRemoteWords(snap.data().words);
-      } else {
+      } else if (!snap.metadata.fromCache) {
+        // オフライン起動時は「データなし」の仮の通知が来るので、サーバーが本当に空と答えたときだけ作る
+        // （そうしないとサンプル5語で共有リストを上書きしてしまう）
         setDoc(wordsDocRef, { words: SAMPLE_DATA }).catch(function (e) {
           console.error("Failed to seed shared word list:", e);
         });
@@ -317,7 +365,8 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     onSnapshot(statsDocRef, function (snap) {
       if (snap.exists() && snap.data().perWord) {
         applyRemoteStats(snap.data());
-      } else {
+      } else if (!snap.metadata.fromCache) {
+        // 単語と同じく、オフライン時の仮の通知で記録を空にしない
         setDoc(statsDocRef, { perWord: {} }).catch(function (e) {
           console.error("Failed to seed shared stats:", e);
         });
@@ -366,6 +415,9 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
         exampleJa: item.exampleJa.trim()
       };
       if (typeof item.pos === "string" && item.pos.trim() !== "") word.pos = item.pos.trim();
+      if (typeof item.etymology === "string" && item.etymology.trim() !== "") word.etymology = item.etymology.trim();
+      if (typeof item.nuance === "string" && item.nuance.trim() !== "") word.nuance = item.nuance.trim();
+      if (typeof item.related === "string" && item.related.trim() !== "") word.related = item.related.trim();
       return word;
     });
     return { valid: true, words: words };
@@ -373,11 +425,19 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
 
   // ---- Quiz session logic ----
 
+  function quizPool(mode) {
+    if (mode === "arrange") {
+      return state.words.filter(function (w) { return tokenizeExample(w.example).length >= 2; });
+    }
+    return state.words.slice();
+  }
+
   function startQuizSession() {
     var q = state.quiz;
-    q.queue = shuffle(state.words.slice());
+    var pool = quizPool(q.mode);
+    q.queue = shuffle(pool);
     q.masteredCount = 0;
-    q.totalUnique = state.words.length;
+    q.totalUnique = pool.length;
     q.questionNumber = 0;
     q.current = null;
     q.answered = false;
@@ -403,6 +463,10 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     q.isCorrect = null;
     if (q.mode === "choice") {
       q.choices = buildChoices(q.current);
+    } else if (q.mode === "arrange") {
+      q.arrangeTokens = tokenizeExample(q.current.example);
+      q.arrangeOrder = shuffleTokenOrder(q.arrangeTokens);
+      q.arrangeSelected = [];
     }
   }
 
@@ -426,6 +490,42 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     q.isCorrect = englishValue === q.current.english;
     if (q.isCorrect) q.masteredCount++; else requeueCurrent();
     recordAnswer(q.current, q.isCorrect);
+  }
+
+  function submitArrange() {
+    var q = state.quiz;
+    if (q.answered) return;
+    q.answered = true;
+    var answerText = q.arrangeSelected.map(function (id) { return q.arrangeTokens[id].text; }).join(" ");
+    var correctText = q.arrangeTokens.map(function (t) { return t.text; }).join(" ");
+    q.isCorrect = answerText === correctText;
+    if (q.isCorrect) q.masteredCount++; else requeueCurrent();
+    recordAnswer(q.current, q.isCorrect);
+  }
+
+  function selectArrangeToken(id) {
+    var q = state.quiz;
+    if (q.answered || q.arrangeSelected.indexOf(id) !== -1) return;
+    q.arrangeSelected.push(id);
+  }
+
+  function deselectArrangeToken(id) {
+    var q = state.quiz;
+    if (q.answered) return;
+    var idx = q.arrangeSelected.indexOf(id);
+    if (idx !== -1) q.arrangeSelected.splice(idx, 1);
+  }
+
+  function undoArrangeToken() {
+    var q = state.quiz;
+    if (q.answered || q.arrangeSelected.length === 0) return;
+    q.arrangeSelected.pop();
+  }
+
+  function clearArrangeTokens() {
+    var q = state.quiz;
+    if (q.answered) return;
+    q.arrangeSelected = [];
   }
 
   function flashcardResult(remembered) {
@@ -456,7 +556,15 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       '<div class="mode-toggle">' +
       '<button class="mode-btn ' + (q.mode === "choice" ? "active" : "") + '" data-action="set-mode" data-mode="choice">選択式</button>' +
       '<button class="mode-btn ' + (q.mode === "flashcard" ? "active" : "") + '" data-action="set-mode" data-mode="flashcard">フラッシュカード</button>' +
+      '<button class="mode-btn ' + (q.mode === "arrange" ? "active" : "") + '" data-action="set-mode" data-mode="arrange">並べ替え</button>' +
       '</div>';
+
+    if (q.totalUnique === 0) {
+      return '<div class="view quiz-view">' + modeToggle +
+        '<div class="card session-complete">' +
+        '<p>この形式で出題できる単語がありません（例文が2語以上のものが対象です）。</p>' +
+        '</div></div>';
+    }
 
     if (q.finished) {
       return '<div class="view quiz-view">' + modeToggle +
@@ -493,11 +601,12 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
           '<div class="english-text">' + escapeHtml(w.english) + '</div>' +
           '<div class="example-text">' + escapeHtml(w.example) + '</div>' +
           '<div class="example-ja-text">' + escapeHtml(w.exampleJa) + '</div>' +
+          extraDetailsHtml(w) +
           '</div>' +
           '<button class="btn btn-primary" data-action="next-question">次の問題へ</button>' +
           '</div>';
       }
-    } else {
+    } else if (q.mode === "flashcard") {
       if (!q.revealed) {
         questionHtml =
           '<div class="card question-card">' +
@@ -512,6 +621,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
           '<div class="english-text">' + escapeHtml(w.english) + '</div>' +
           '<div class="example-text">' + escapeHtml(w.example) + '</div>' +
           '<div class="example-ja-text">' + escapeHtml(w.exampleJa) + '</div>' +
+          extraDetailsHtml(w) +
           '</div>' +
           '<div class="flashcard-buttons">' +
           '<button class="btn btn-outline" data-action="flashcard-again">もう一度</button>' +
@@ -519,9 +629,55 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
           '</div>' +
           '</div>';
       }
+    } else {
+      questionHtml = renderArrangeQuestion(q, w);
     }
 
     return '<div class="view quiz-view">' + modeToggle + progressHtml + questionHtml + '</div>';
+  }
+
+  function renderArrangeQuestion(q, w) {
+    if (!q.answered) {
+      var selectedHtml = q.arrangeSelected.length
+        ? q.arrangeSelected.map(function (id) {
+            return '<button class="arrange-slot-btn" data-action="arrange-deselect" data-id="' + id + '">' + escapeHtml(q.arrangeTokens[id].text) + '</button>';
+          }).join("")
+        : '<span class="arrange-slot-placeholder">タップして単語を並べてください</span>';
+
+      var tokenHtml = q.arrangeOrder
+        .filter(function (id) { return q.arrangeSelected.indexOf(id) === -1; })
+        .map(function (id) {
+          return '<button class="arrange-token-btn" data-action="arrange-select" data-id="' + id + '">' + escapeHtml(q.arrangeTokens[id].text) + '</button>';
+        }).join("");
+
+      var allSelected = q.arrangeSelected.length === q.arrangeTokens.length;
+
+      return '<div class="card question-card arrange-card">' +
+        '<div class="arrange-hint">' + escapeHtml(w.japanese) + '</div>' +
+        '<div class="japanese-text">' + escapeHtml(w.exampleJa) + '</div>' +
+        '<div class="arrange-answer-area">' + selectedHtml + '</div>' +
+        '<div class="arrange-token-area">' + tokenHtml + '</div>' +
+        '<div class="arrange-controls">' +
+        '<button class="btn btn-outline" data-action="arrange-undo"' + (q.arrangeSelected.length ? '' : ' disabled') + '>1つ戻す</button>' +
+        '<button class="btn btn-outline" data-action="arrange-clear"' + (q.arrangeSelected.length ? '' : ' disabled') + '>クリア</button>' +
+        '</div>' +
+        '<button class="btn btn-primary" data-action="arrange-submit"' + (allSelected ? '' : ' disabled') + '>答え合わせ</button>' +
+        '</div>';
+    }
+
+    var resultClass = q.isCorrect ? "correct" : "incorrect";
+    var resultText = q.isCorrect ? "✅ 正解！" : "❌ 不正解";
+    return '<div class="card question-card">' +
+      '<div class="japanese-text">' + escapeHtml(w.exampleJa) + '</div>' +
+      '<div class="result-text ' + resultClass + '">' + resultText + '</div>' +
+      '<div class="answer-detail">' +
+      '<div class="english-text">' + escapeHtml(w.english) + '</div>' +
+      '<div class="example-text">' + escapeHtml(w.example) + '</div>' +
+      '<div class="example-ja-text">' + escapeHtml(w.exampleJa) + '</div>' +
+      extraDetailsHtml(w) +
+      '</div>' +
+      '<button class="btn btn-primary" data-action="next-question">次の問題へ</button>' +
+      '</div>';
   }
 
   var POS_ORDER = ["動詞", "句動詞", "イディオム", "名詞", "形容詞", "副詞", "前置詞", "接続詞"];
@@ -602,6 +758,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       '<div class="japanese-text">' + escapeHtml(w.japanese) + '</div>' +
       '<div class="example-text">' + escapeHtml(w.example) + '</div>' +
       '<div class="example-ja-text">' + escapeHtml(w.exampleJa) + '</div>' +
+      extraDetailsHtml(w) +
       '</div>';
   }
 
@@ -753,7 +910,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     return '<div class="view import-view">' +
       '<section class="card">' +
       '<h2>① 新しい単語を取り込む</h2>' +
-      '<p class="hint">english / japanese / example / exampleJa の4項目（必須）を持つオブジェクトの配列（JSON）を貼り付けてください。任意で pos（品詞：動詞・名詞・形容詞・副詞・イディオムなど）も指定すると、一覧画面で品詞順に並べ替えられます。<br>※ english が既存の単語と重複する場合はスキップされます（上書きはされません）。</p>' +
+      '<p class="hint">english / japanese / example / exampleJa の4項目（必須）を持つオブジェクトの配列（JSON）を貼り付けてください。任意で pos（品詞：動詞・名詞・形容詞・副詞・イディオムなど）、etymology（語源）、nuance（ニュアンス）、related（関連表現）も指定できます。<br>※ english が既存の単語と重複する場合はスキップされます（上書きはされません）。</p>' +
       '<textarea id="import-textarea" rows="8" placeholder=\'[{"english": "...", "japanese": "...", "example": "...", "exampleJa": "..."}]\'></textarea>' +
       '<button class="btn btn-primary" data-action="import-words">取り込む</button>' +
       '<div id="import-message" class="message"></div>' +
@@ -923,6 +1080,11 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       case "reveal-flashcard": state.quiz.revealed = true; render(); return;
       case "flashcard-again": flashcardResult(false); render(); return;
       case "flashcard-remembered": flashcardResult(true); render(); return;
+      case "arrange-select": selectArrangeToken(parseInt(target.dataset.id, 10)); render(); return;
+      case "arrange-deselect": deselectArrangeToken(parseInt(target.dataset.id, 10)); render(); return;
+      case "arrange-undo": undoArrangeToken(); render(); return;
+      case "arrange-clear": clearArrangeTokens(); render(); return;
+      case "arrange-submit": submitArrange(); render(); return;
       case "import-words": handleImportWords(); return;
       case "export-words": handleExportWords(); return;
     }
