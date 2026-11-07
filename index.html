@@ -7,6 +7,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#3f6fa8">
+<meta name="apple-mobile-web-app-title" content="英単語クイズ">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <title>英単語クイズ</title>
 <style>
   :root {
@@ -1114,6 +1118,14 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
 
   init();
 })();
+</script>
+<script>
+  // オフライン対応：公開ページ（https）でだけ service worker を登録。アプリに戻るたびに新しい版がないか確かめる
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+    navigator.serviceWorker.register("sw.js").then(function (reg) {
+      document.addEventListener("visibilitychange", function () { if (!document.hidden) reg.update().catch(function () {}); });
+    }).catch(function () {});
+  }
 </script>
 </body>
 </html>
