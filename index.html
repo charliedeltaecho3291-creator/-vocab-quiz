@@ -18,10 +18,10 @@
     --color-card: #ffffff;
     --color-primary: #3f6fa8;
     --color-primary-dark: #2f5686;
-    --color-success: #3f9a6e;
-    --color-error: #d1555c;
+    --color-success: #2c7d57;
+    --color-error: #bf444b;
     --color-text: #24303f;
-    --color-text-muted: #6b7684;
+    --color-text-muted: #636e7c;
     --color-border: #e2e6ec;
     --radius: 14px;
   }
@@ -36,6 +36,8 @@
     -webkit-font-smoothing: antialiased;
   }
   input, textarea, button, select { font-family: inherit; }
+  ::selection { background: #cfdbe9; color: var(--color-text); }
+  input, textarea { caret-color: var(--color-primary); }
   input[type="search"], input[type="text"], textarea { font-size: 16px; }
 
   #app { max-width: 480px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
@@ -54,22 +56,30 @@
   }
   .nav-btn { flex: 1; border: none; background: none; padding: 10px 0 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.72rem; color: var(--color-text-muted); }
   .nav-btn .nav-icon { font-size: 1.3rem; line-height: 1; }
+  .nav-btn:active { background: var(--color-bg); }
   .nav-btn.active { color: var(--color-primary); font-weight: 600; }
 
   .card { background: var(--color-card); border-radius: var(--radius); padding: 18px; box-shadow: 0 1px 3px rgba(20,30,50,0.06); }
 
   .btn { display: block; width: 100%; padding: 14px; border-radius: 10px; border: none; font-size: 1rem; font-weight: 600; margin-top: 10px; min-height: 48px; cursor: pointer; }
   .btn-primary { background: var(--color-primary); color: #fff; }
-  .btn-primary:active { background: var(--color-primary-dark); }
+  .btn-primary:active:not(:disabled) { background: var(--color-primary-dark); }
   .btn-secondary { background: #eef2f7; color: var(--color-primary-dark); }
+  .btn-secondary:active:not(:disabled) { background: #cfdbe9; }
   .btn-outline { background: #fff; border: 1px solid var(--color-border); color: var(--color-text); }
+  .btn-outline:active:not(:disabled) { background: #eef2f7; border-color: #cfdbe9; }
   .btn:disabled { opacity: 0.4; cursor: default; }
+  /* 押した手応え：押している間だけ色が沈み、わずかに縮む */
+  .btn, .choice-btn, .mode-btn, .nav-btn, .filter-chip, .arrange-token-btn, .arrange-slot-btn { transition: background-color .12s ease-out, color .12s ease-out, transform .12s ease-out; }
+  .btn:active:not(:disabled), .choice-btn:active, .arrange-token-btn:active, .arrange-slot-btn:active, .filter-chip:active { transform: scale(0.97); }
+  @media (prefers-reduced-motion: reduce) { .btn, .choice-btn, .mode-btn, .nav-btn, .filter-chip, .arrange-token-btn, .arrange-slot-btn { transition: none; transform: none !important; } }
 
   .mode-toggle { display: flex; background: #eef1f5; border-radius: 10px; padding: 4px; }
   .mode-btn { flex: 1; border: none; background: none; padding: 10px 2px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; color: var(--color-text-muted); min-height: 40px; white-space: nowrap; }
+  .mode-btn:active:not(.active) { background: rgba(255,255,255,0.55); color: var(--color-text); }
   .mode-btn.active { background: #fff; color: var(--color-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
 
-  .progress-text { text-align: center; font-size: 0.85rem; color: var(--color-text-muted); }
+  .progress-text { font-variant-numeric: tabular-nums; text-align: center; font-size: 0.85rem; color: var(--color-text-muted); }
 
   .question-card { text-align: center; }
   .japanese-text { font-size: 1.3rem; font-weight: 500; color: var(--color-text); margin-bottom: 18px; line-height: 1.6; }
@@ -98,6 +108,7 @@
   .arrange-answer-area { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 8px; justify-content: flex-start; min-height: 52px; padding: 10px; border: 1px dashed var(--color-border); border-radius: 10px; margin: 14px 0; text-align: left; }
   .arrange-slot-placeholder { font-size: 0.85rem; color: var(--color-text-muted); }
   .arrange-slot-btn { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--color-primary); background: #eef2f7; color: var(--color-primary-dark); font-weight: 600; font-size: 0.95rem; min-height: 40px; }
+  .arrange-slot-btn:active { background: #cfdbe9; }
   .arrange-token-area { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 14px; }
   .arrange-token-btn { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--color-border); background: #fff; color: var(--color-text); font-weight: 600; font-size: 0.95rem; min-height: 40px; }
   .arrange-token-btn:active { background: #eef2f7; }
@@ -110,11 +121,12 @@
   .empty-state { text-align: center; padding-top: 60px; color: var(--color-text-muted); }
 
   .search-bar input { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--color-border); background: #fff; }
-  .count-text { font-size: 0.8rem; color: var(--color-text-muted); text-align: right; }
+  .count-text { font-variant-numeric: tabular-nums; font-size: 0.8rem; color: var(--color-text-muted); text-align: right; }
   .word-card { background: #fff; border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(20,30,50,0.05); }
   .pos-badge { display: inline-block; font-size: 0.7rem; font-weight: 700; color: var(--color-primary); background: #eef2f7; padding: 2px 8px; border-radius: 999px; margin-bottom: 6px; }
   .filter-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .filter-chip { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--color-border); background: #fff; font-size: 0.82rem; font-weight: 600; color: var(--color-text-muted); min-height: 32px; }
+  .filter-chip { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--color-border); background: #fff; font-size: 0.82rem; font-weight: 600; color: var(--color-text-muted); min-height: 40px; }
+  .filter-chip:active:not(.active) { background: #eef2f7; }
   .filter-chip.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
   .filter-chip.chip-letter { padding: 6px 10px; min-width: 30px; text-align: center; }
   .list-group-header { font-size: 0.8rem; font-weight: 700; color: var(--color-primary-dark); background: #eef2f7; padding: 6px 10px; border-radius: 8px; }
@@ -126,7 +138,7 @@
 
   .stats-numbers { display: flex; justify-content: space-around; margin-top: 10px; }
   .stat-item { text-align: center; }
-  .stat-value { font-size: 1.4rem; font-weight: 700; color: var(--color-primary-dark); }
+  .stat-value { font-variant-numeric: tabular-nums; font-size: 1.4rem; font-weight: 700; color: var(--color-primary-dark); }
   .stat-label { font-size: 0.75rem; color: var(--color-text-muted); margin-top: 2px; }
   .weak-word-list { display: flex; flex-direction: column; gap: 0; margin-top: 10px; }
   .weak-word-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--color-border); }
@@ -136,7 +148,7 @@
   .weak-word-main .english-text { font-size: 1rem; margin-bottom: 2px; }
   .weak-word-main .japanese-text { font-size: 0.85rem; margin-bottom: 0; }
   .weak-word-count { text-align: right; flex-shrink: 0; }
-  .weak-word-wrong { font-size: 0.9rem; font-weight: 700; color: var(--color-error); }
+  .weak-word-wrong { font-variant-numeric: tabular-nums; font-size: 0.9rem; font-weight: 700; color: var(--color-error); }
   .weak-word-acc { font-size: 0.72rem; color: var(--color-text-muted); margin-top: 2px; }
 
   textarea { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--color-border); resize: vertical; }
@@ -1110,11 +1122,14 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       subscribeToStats();
     } catch (e) {
       document.getElementById("app").innerHTML =
-        '<div style="padding:40px 20px;text-align:center;color:#d1555c;line-height:1.6;">' +
+        '<div style="padding:40px 20px;text-align:center;color:#bf444b;line-height:1.6;">' +
         '読み込み中にエラーが発生しました。<br>' + escapeHtml(e && e.message ? e.message : String(e)) +
         '</div>';
     }
   }
+
+  // iPhoneのSafariは、タッチの受け口がないと押している間の色（:active）を出さない
+  document.addEventListener("touchstart", function () {}, { passive: true });
 
   init();
 })();
