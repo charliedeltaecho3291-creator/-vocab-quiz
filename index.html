@@ -627,7 +627,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
   }
 
   // ---- Quiz session logic ----
-  // 1回20語。苦手な単語（最大8）＋まだ出ていない新しい単語（最大8）＋残りから。
+  // 1回20語。苦手な単語（最大8）＋まだ出ていない単語（最大4、ランダム）＋残りは全単語からランダム。
   // 進み具合はモードごとに持ち、端末に保存する（タブに触れても、アプリが読み直されても消えない）
   var SESSION_SIZE = 20;
   var SESSION_KEY = "vocabQuizSession_v1";
@@ -668,7 +668,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       }
     }
     take(weakList(pool), 8);
-    take(pool.filter(function (w) { return !statOf(w); }).reverse(), 8);  // 新しく入れた順
+    take(shuffle(pool.filter(function (w) { return !statOf(w); })), 4);  // 新しく入れた順に偏らないよう混ぜる
     take(shuffle(pool), SESSION_SIZE);
     return shuffle(chosen);
   }
@@ -912,7 +912,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       (parked ? '<button class="btn btn-primary" data-action="resume-parked">途中の20語に戻る（残り' + (parked.totalUnique - parked.masteredCount) + '語）</button>'
               : '<button class="btn btn-primary" data-action="next-session">次の' + SESSION_SIZE + '語</button>') +
       (missed.length ? '<button class="btn btn-outline" data-action="retry-missed">ミスだけもう一度（' + missed.length + '語）</button>' : '') +
-      (parked ? '' : '<p class="complete-note">次の20語は、苦手な単語（最大8語）と、まだ一度も出ていない新しい単語（最大8語）を優先して選びます。</p>') +
+      (parked ? '' : '<p class="complete-note">次の20語は、苦手な単語（最大8語）と、まだ一度も出ていない単語（最大4語）を優先し、残りは全単語からランダムに選びます。</p>') +
       '</div>';
   }
 
