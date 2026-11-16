@@ -203,10 +203,23 @@
   .missed-list details[open] summary .chev, .weak-word-row[aria-expanded="true"] .chev, .word-row[aria-expanded="true"] .chev { transform: rotate(180deg); }
   .missed-list .detail { padding: 0 0 12px; }
   .chev { width: 18px; height: 18px; flex-shrink: 0; fill: none; stroke: var(--color-text-muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s ease-out; }
-  .complete-note { font-size: 0.78rem; color: var(--color-text-muted); margin-top: 12px; line-height: 1.6; }
-  .missed-list .row { padding: 10px 0; border-bottom: 1px solid var(--color-border); }
-  .missed-list .row .english-text { font-size: 1rem; margin-bottom: 2px; }
-  .missed-list .row .japanese-text { font-size: 0.85rem; margin-bottom: 0; }
+  /* ミスした単語は一覧の1行と同じ大きさ（問題文の大きさにしない）。押せる高さは44px以上 */
+  .missed-list summary { min-height: 44px; }
+  .missed-list summary .english-text { font-size: 1rem; margin-bottom: 2px; }
+  .missed-list summary .japanese-text { font-size: 0.85rem; margin-bottom: 0; line-height: 1.5; }
+  /* 終わりのカードの操作は、ミスが多くても画面下（タブの上）でいつも押せる */
+  .complete-actions { background: var(--color-card); margin-top: 6px; }
+  .complete-actions .btn:first-child { margin-top: 0; }
+  .session-complete.pin-bottom { display: flex; flex-direction: column; min-height: calc(100svh - 230px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  .session-complete.pin-bottom > .complete-actions { margin-top: auto; }
+  .complete-note { font-size: 0.78rem; color: var(--color-text-muted); margin-top: 14px; line-height: 1.6; text-align: left; }
+  .complete-note summary { list-style: none; cursor: pointer; text-align: center; padding: 10px 0; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 4px; }
+  .complete-note summary::-webkit-details-marker { display: none; }
+  .complete-note[open] summary .chev { transform: rotate(180deg); }
+  .complete-note summary .chev { width: 14px; height: 14px; }
+  /* 並べ替えの操作（1つ戻す・クリア・答え合わせ）も、ほかのモードと同じ低い位置に貼り付く */
+  .arrange-actions { background: var(--color-card); }
+  .arrange-actions .arrange-controls { margin-bottom: 0; }
 
   .empty-state { text-align: center; padding-top: 60px; color: var(--color-text-muted); }
 
@@ -905,14 +918,16 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     }).join("");
     var title = { normal: "20語おわりました", weak: "苦手な単語の復習おわり", retry: "ミスした単語の復習おわり" }[q.kind] || "おわりました";
     if (q.kind === "normal" && q.totalUnique < SESSION_SIZE) title = q.totalUnique + "語おわりました";
-    return '<div class="card session-complete">' +
+    return '<div class="card session-complete pin-bottom">' +
       '<p class="complete-title">' + title + '</p>' +
       '<p class="complete-score">一度で正解 <b>' + firstOk + '</b>語 ・ ミス <b>' + missed.length + '</b>語</p>' +
       (missedRows ? '<div class="missed-list">' + missedRows + '</div>' : '') +
+      '<div class="complete-actions sticky-action">' +
       (parked ? '<button class="btn btn-primary" data-action="resume-parked">途中の20語に戻る（残り' + (parked.totalUnique - parked.masteredCount) + '語）</button>'
               : '<button class="btn btn-primary" data-action="next-session">次の' + SESSION_SIZE + '語</button>') +
       (missed.length ? '<button class="btn btn-outline" data-action="retry-missed">ミスだけもう一度（' + missed.length + '語）</button>' : '') +
-      (parked ? '' : '<p class="complete-note">次の20語は、苦手な単語（最大8語）と、まだ一度も出ていない単語（最大4語）を優先し、残りは全単語からランダムに選びます。</p>') +
+      '</div>' +
+      (parked ? '' : '<details class="complete-note"><summary>次の20語の選び方<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>苦手な単語（最大8語）と、まだ一度も出ていない単語（最大4語）を優先し、残りは全単語からランダムに選びます。</details>') +
       '</div>';
   }
 
@@ -1036,16 +1051,18 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
 
       var allSelected = q.arrangeSelected.length === n;
 
-      return '<div class="card question-card arrange-card">' +
+      return '<div class="card question-card arrange-card pin-bottom">' +
         '<div class="japanese-text">' + escapeHtml(w.exampleJa) + '</div>' +
         '<div class="arrange-hint">使う表現：' + escapeHtml(w.japanese) + '</div>' +
         '<div class="arrange-answer-area">' + selectedHtml + '</div>' +
         '<div class="arrange-token-area">' + tokenHtml + '</div>' +
+        '<div class="arrange-actions sticky-action">' +
         '<div class="arrange-controls">' +
         '<button class="btn btn-outline" data-action="arrange-undo"' + (q.arrangeSelected.length ? '' : ' disabled') + '>1つ戻す</button>' +
         '<button class="btn btn-outline" data-action="arrange-clear"' + (q.arrangeSelected.length ? '' : ' disabled') + '>クリア</button>' +
         '</div>' +
         '<button class="btn btn-primary" data-action="arrange-submit"' + (allSelected ? '' : ' disabled') + '>答え合わせ</button>' +
+        '</div>' +
         '</div>';
     }
 
