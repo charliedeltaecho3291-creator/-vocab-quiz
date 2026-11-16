@@ -117,6 +117,46 @@
   .btn:active:not(:disabled), .choice-btn:active, .arrange-token-btn:active, .arrange-slot-btn:active, .filter-chip:active { transform: scale(0.97); }
   @media (prefers-reduced-motion: reduce) { .btn, .choice-btn, .mode-btn, .nav-btn, .filter-chip, .arrange-token-btn, .arrange-slot-btn { transition: none; transform: none !important; } }
 
+  /* ---- 動き ----
+     画面は操作のたびに描き直すので、動きは「その操作のときだけ」#app[data-motion] で出す。
+     どれも既定は見えている状態（動きが効かなくても内容は消えない）。 */
+  :root { --ease-out: cubic-bezier(0.16, 1, 0.3, 1); }
+  @keyframes enter-next { from { opacity: 0; transform: translateX(14px); } }
+  @keyframes enter-fade { from { opacity: 0; } }
+  @keyframes unfold { from { opacity: 0; transform: translateY(-6px); } }
+  @keyframes settle { from { opacity: 0; transform: translateY(10px); } }
+  @keyframes place { from { transform: scale(0.88); } }
+  @keyframes draw { from { stroke-dashoffset: 30; } to { stroke-dashoffset: 0; } }
+  /* 次の問題：紙を1枚めくるように、右から軽く入る */
+  #app[data-motion="next"] .question-card { animation: enter-next .26s var(--ease-out) both; }
+  /* モードを切り替えたとき：位置は変えず、ふっと入れ替わる */
+  #app[data-motion="mode"] .question-card, #app[data-motion="mode"] .session-complete { animation: enter-fade .18s ease-out both; }
+  /* 答えたあと：正誤の印は線が描かれるように、例文は下に開く */
+  #app[data-motion="answer"] .result-text { animation: enter-fade .16s ease-out both; }
+  #app[data-motion="answer"] .verdict-icon path { stroke-dasharray: 30; animation: draw .32s var(--ease-out) .05s both; }
+  #app[data-motion="answer"] .answer-detail, #app[data-motion="answer"] .picked-meaning, #app[data-motion="answer"] .arrange-yours { animation: unfold .24s var(--ease-out) .06s both; }
+  /* 並べ替え：いま置いた単語だけが、小さく置かれる */
+  #app[data-motion="place"] .arrange-slot-btn:last-child { animation: place .14s var(--ease-out); }
+  /* 一覧・統計・終わりのカードで、単語を開いたとき */
+  #app[data-motion="unfold"] .word-detail, #app[data-motion="unfold"] .weak-word-detail { animation: unfold .2s var(--ease-out) both; }
+  .missed-list details[open] > .detail, .complete-note[open] > :not(summary) { animation: unfold .2s var(--ease-out) both; }
+  /* 20語おわったとき（この画面のいちばんの場面）：ノートを閉じるように、静かに順に置かれる */
+  #app[data-motion="complete"] .session-complete { animation: enter-fade .3s ease-out both; }
+  #app[data-motion="complete"] .session-complete > * { animation: settle .5s var(--ease-out) both; }
+  #app[data-motion="complete"] .session-complete > :nth-child(2) { animation-delay: .06s; }
+  #app[data-motion="complete"] .session-complete > :nth-child(3) { animation-delay: .12s; }
+  #app[data-motion="complete"] .session-complete > :nth-child(4) { animation-delay: .18s; }
+  #app[data-motion="complete"] .session-complete > :nth-child(n+5) { animation-delay: .24s; }
+  @media (prefers-reduced-motion: reduce) {
+    /* 移動はやめて、薄く現れる・色が変わる表現だけを残す */
+    #app[data-motion] .question-card, #app[data-motion] .session-complete, #app[data-motion] .session-complete > *,
+    #app[data-motion] .answer-detail, #app[data-motion] .picked-meaning, #app[data-motion] .arrange-yours,
+    #app[data-motion] .word-detail, #app[data-motion] .weak-word-detail,
+    .missed-list details[open] > .detail, .complete-note[open] > :not(summary) { animation-name: enter-fade !important; animation-delay: 0s !important; }
+    #app[data-motion] .verdict-icon path, #app[data-motion] .arrange-slot-btn:last-child { animation: none !important; }
+    .progress-bar span { transition: none !important; }
+  }
+
   .mode-toggle { display: flex; background: transparent; border: 1px solid var(--color-border); border-radius: 10px; padding: 4px; }
   .mode-btn { flex: 1; border: none; background: none; padding: 10px 2px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; color: var(--color-text-muted); min-height: 40px; white-space: nowrap; }
   .mode-btn:active:not(.active) { background: var(--color-thumb-press); color: var(--color-text); }
@@ -1582,8 +1622,16 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
   }
   if (sysDark.addEventListener) sysDark.addEventListener("change", applyTheme); else if (sysDark.addListener) sysDark.addListener(applyTheme);
 
+  // 動きの合図：操作ごとに1回だけ出す（描き直しのたびに動かないように）
+  var motionCue = "";
+  var lastProgressPct = null;
+  function cue(name) { motionCue = name; }
+  function afterQuizStep() { return state.quiz.finished ? "complete" : "next"; }
+
   function render() {
     var app = document.getElementById("app");
+    app.dataset.motion = motionCue;
+    motionCue = "";
     app.innerHTML =
       '<header class="app-header"><span class="sync-badge" id="sync-badge" role="status">' + escapeHtml(syncBadgeText()) + '</span><h1>英単語クイズ</h1>' + themeButtonHtml() + '</header>' +
       '<main class="app-main">' + viewHtml() + '</main>' +
@@ -1593,6 +1641,17 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       '<button class="nav-btn ' + (state.view === "stats" ? "active" : "") + '" data-action="nav" data-view="stats"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M7 16v-5M12 16V6M17 16v-8"/></svg></span><span>統計</span></button>' +
       '<button class="nav-btn ' + (state.view === "import" ? "active" : "") + '" data-action="nav" data-view="import"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4v10M7.5 10l4.5 4.5 4.5-4.5"/><path d="M4 16v3.5h16V16"/></svg></span><span>取り込み</span></button>' +
       '</nav>';
+    // 進み具合の棒は、前の長さからなめらかに伸ばす
+    var bar = app.querySelector(".progress-bar span");
+    if (bar) {
+      var to = bar.style.width;
+      if (lastProgressPct !== null && lastProgressPct !== to) {
+        bar.style.width = lastProgressPct;
+        void bar.offsetWidth;
+        bar.style.width = to;
+      }
+      lastProgressPct = to;
+    }
     if (state.view === "list") attachListView();
     if (state.view === "import") attachImportView();
   }
@@ -1610,29 +1669,29 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       case "nav": setView(target.dataset.view); return;
       case "toggle-theme": cycleTheme(); return;
       case "goto-import": setView("import"); return;
-      case "restart-quiz": case "next-session": startQuizSession("normal"); render(); return;
-      case "retry-missed": startQuizSession("retry", missedKeys(state.quiz)); render(); return;
+      case "restart-quiz": case "next-session": startQuizSession("normal"); cue("next"); render(); return;
+      case "retry-missed": startQuizSession("retry", missedKeys(state.quiz)); cue("next"); render(); return;
       case "start-weak": startQuizSession("weak"); setView("quiz"); window.scrollTo(0, 0); return;
-      case "toggle-weak": state.statsOpen = state.statsOpen === target.dataset.key ? "" : target.dataset.key; render(); return;
+      case "toggle-weak": state.statsOpen = state.statsOpen === target.dataset.key ? "" : target.dataset.key; cue("unfold"); render(); return;
       case "undo-restore": undoRestore(); return;
       case "paste-clipboard": pasteFromClipboard(); return;
-      case "set-mode": setQuizMode(target.dataset.mode); render(); return;
+      case "set-mode": setQuizMode(target.dataset.mode); cue("mode"); render(); return;
       case "set-list-sort": state.list.sort = target.dataset.sort; state.list.limit = 50; render(); return;
       case "set-list-filter": state.list.posFilter = target.dataset.filter; state.list.limit = 50; render(); return;
       case "set-list-letter": state.list.letterFilter = target.dataset.letter; state.list.limit = 50; render(); return;
-      case "toggle-word": state.list.open = state.list.open === target.dataset.key ? "" : target.dataset.key; updateListResults(); return;
-      case "list-more": state.list.limit += 50; updateListResults(); return;
-      case "resume-parked": resumeParked(); render(); window.scrollTo(0, 0); return;
-      case "submit-choice": submitChoice(target.dataset.value); render(); return;
-      case "next-question": advanceQuestion(); saveSessions(); render(); window.scrollTo(0, 0); return;
-      case "flashcard-again": flashcardResult(false); render(); window.scrollTo(0, 0); return;
-      case "reveal-flashcard": state.quiz.revealed = true; saveSessions(); render(); return;
-      case "flashcard-remembered": flashcardResult(true); render(); window.scrollTo(0, 0); return;
-      case "arrange-select": selectArrangeToken(parseInt(target.dataset.id, 10)); saveSessions(); render(); return;
+      case "toggle-word": state.list.open = state.list.open === target.dataset.key ? "" : target.dataset.key; document.getElementById("app").dataset.motion = "unfold"; updateListResults(); return;
+      case "list-more": state.list.limit += 50; document.getElementById("app").dataset.motion = ""; updateListResults(); return;
+      case "resume-parked": resumeParked(); cue("next"); render(); window.scrollTo(0, 0); return;
+      case "submit-choice": submitChoice(target.dataset.value); cue("answer"); render(); return;
+      case "next-question": advanceQuestion(); saveSessions(); cue(afterQuizStep()); render(); window.scrollTo(0, 0); return;
+      case "flashcard-again": flashcardResult(false); cue(afterQuizStep()); render(); window.scrollTo(0, 0); return;
+      case "reveal-flashcard": state.quiz.revealed = true; saveSessions(); cue("answer"); render(); return;
+      case "flashcard-remembered": flashcardResult(true); cue(afterQuizStep()); render(); window.scrollTo(0, 0); return;
+      case "arrange-select": selectArrangeToken(parseInt(target.dataset.id, 10)); saveSessions(); cue("place"); render(); return;
       case "arrange-deselect": deselectArrangeToken(parseInt(target.dataset.id, 10)); saveSessions(); render(); return;
       case "arrange-undo": undoArrangeToken(); saveSessions(); render(); return;
       case "arrange-clear": clearArrangeTokens(); saveSessions(); render(); return;
-      case "arrange-submit": submitArrange(); render(); return;
+      case "arrange-submit": submitArrange(); cue("answer"); render(); return;
       case "import-words": handleImportWords(); return;
       case "export-words": handleExportWords(); return;
     }
