@@ -16,10 +16,12 @@
   // 夜に開いたとき一瞬明るくならないよう、本体より先にテーマを決める（保存がなければiPhoneの設定に合わせる）
   // 2026-11-19〜 黒いガラスの表示に固定（ライト表示と切り替えボタンはやめた）
   document.documentElement.setAttribute("data-theme", "dark");
-  // ナビの位置：新しいキー navLayoutPref（auto / rail / bottom）。自動は画面幅450px以上で右の縦ナビ
+  // ナビの位置：新しいキー navLayoutPref（auto / rail / bottom）。
+  // 自動は「screen.width と innerWidth の差が40px以上（右にシステムの列がある＝Duo）」か「innerWidth 600px以上」で右の縦ナビ
   try {
     var np = localStorage.getItem("navLayoutPref") || "auto";
-    document.documentElement.setAttribute("data-nav", np === "rail" || np === "bottom" ? np : (window.matchMedia("(min-width: 450px)").matches ? "rail" : "bottom"));
+    var railAuto = (screen.width - window.innerWidth >= 40) || window.innerWidth >= 600;
+    document.documentElement.setAttribute("data-nav", np === "rail" || np === "bottom" ? np : (railAuto ? "rail" : "bottom"));
   } catch (e) { document.documentElement.setAttribute("data-nav", "bottom"); }
 </script>
 <style>
@@ -415,13 +417,31 @@
   .nav-sheet h2 { text-align: center; margin-bottom: 12px; }
   .nav-pref-note { font-size: 0.75rem; color: var(--color-text-muted); text-align: center; margin: 8px 0 0; }
 
-  /* ---- 一時的なデバッグ表示（右の黒い列の確認用。確認が終わったら DEBUG_VIEWPORT の部分ごと消す）---- */
+  /* 設定の「表示情報」：押したときだけ画面の数値を出す */
   .vp-probe { position: fixed; left: 0; top: 0; width: 0; height: 0; visibility: hidden; pointer-events: none;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
-  .vp-debug { position: fixed; z-index: 30; left: calc(6px + env(safe-area-inset-left)); top: calc(6px + env(safe-area-inset-top)); max-width: 240px;
-    font: 10px/1.45 ui-monospace, Menlo, monospace; color: #e6e6e6; background: rgba(0,0,0,0.78); border: 1px solid rgba(255,255,255,0.25); border-radius: 8px; padding: 5px 7px; white-space: pre; }
-  /* アプリが描ける範囲の外枠（赤い点線）。右の黒い列の上に線が来ていれば、そこまで描けている */
-  .vp-edge { position: fixed; inset: 0; z-index: 29; pointer-events: none; outline: 2px dashed rgba(255,120,120,0.7); outline-offset: -2px; }
+  .vp-info { margin: 10px 0 0; font: 0.75rem/1.55 ui-monospace, Menlo, monospace; color: var(--color-text-muted); background: rgba(0,0,0,0.35); border: 1px solid var(--color-border); border-radius: 10px; padding: 8px 10px; white-space: pre-wrap; }
+  .vp-info[hidden] { display: none; }
+
+  /* ---- 幅が狭いとき（450px未満、Duoを閉じたとき）の右ナビ：コンパクトに、アプリ領域の右端へぴったり ---- */
+  @media (max-width: 449px) {
+    html[data-nav="rail"] { --rail-w: 56px; --rail-gap: 0px; }
+    html[data-nav="rail"] #app { padding-right: calc(var(--rail-w) + 4px + env(safe-area-inset-right)); }
+    html[data-nav="rail"] .bottom-nav {
+      right: env(safe-area-inset-right); width: var(--rail-w); padding: 8px 4px; gap: 4px;
+      border-right: none; border-radius: 22px 0 0 22px;   /* 右側は角を付けず、右の時刻の列とつながって見えるように */
+      background: rgba(10,10,10,0.82);
+    }
+    html[data-nav="rail"] .nav-btn { width: 48px; height: 50px; border-radius: 16px; font-size: 10px; }
+    html[data-nav="rail"] .nav-btn .nav-icon svg { width: 21px; height: 21px; }
+    /* 選択肢の文字が窮屈にならないよう、左右の余白を少し減らす */
+    html[data-nav="rail"] .app-main { padding-left: 10px; padding-right: 6px; }
+    html[data-nav="rail"] .card { padding: 16px 12px; }
+    html[data-nav="rail"] .choice-btn { padding: 12px 10px; }
+    html[data-nav="rail"] .sticky-action::before { left: -12px; right: -12px; }
+    html[data-nav="rail"] .filter-chips { margin: 0 -6px 0 -10px; padding: 0 6px 2px 10px; }
+    html[data-nav="rail"] .sync-badge { left: 8px; }
+  }
 </style>
 </head>
 <body>
@@ -1510,8 +1530,10 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       '</section>' +
       '<section class="card">' +
       '<h2>③ 表示の設定：ナビの位置</h2>' +
-      '<p class="hint">自動は、画面幅が450px以上なら右の縦ナビ、それより狭ければ下のタブになります。ナビの長押しでも選べます。</p>' +
+      '<p class="hint">自動は、iPhone Duo（右に時刻の列がある画面）か画面幅600px以上なら右の縦ナビ、それ以外は下のタブになります。ナビの長押しでも選べます。</p>' +
       navPrefButtonsHtml() +
+      '<button class="btn btn-outline" data-action="toggle-vp-info">' + (vpInfoOpen ? "表示情報を閉じる" : "表示情報") + '</button>' +
+      '<pre id="vp-info" class="vp-info"' + (vpInfoOpen ? "" : " hidden") + '></pre>' +
       '</section>' +
       '</div>';
   }
@@ -1729,22 +1751,23 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
   // ---- ナビの位置（右の縦ナビ / 下のタブ / 自動）----
   // 新しいキー navLayoutPref だけを使う。既存のキーには触れない
   var NAV_PREF_KEY = "navLayoutPref";
-  var wideMq = window.matchMedia("(min-width: 450px)");
+  // 自動：右にシステムの列がある（screen.width − innerWidth ≥ 40px＝Duo）か、innerWidth ≥ 600px なら右ナビ
+  function railAuto() { return (screen.width - window.innerWidth >= 40) || window.innerWidth >= 600; }
   function navPref() { try { var v = localStorage.getItem(NAV_PREF_KEY); return v === "rail" || v === "bottom" ? v : "auto"; } catch (e) { return "auto"; } }
   function navPrefNote() {
     if (navPref() !== "auto") return "ナビの長押しでも変えられます";
-    return "自動：今の画面幅 " + window.innerWidth + "px → " + (wideMq.matches ? "右ナビ（450px以上）" : "下ナビ（450px未満）");
+    return "自動：今は" + (railAuto() ? "右ナビ" : "下ナビ") + "（画面幅 " + window.innerWidth + "px）";
   }
   function applyNavLayout() {
     var pref = navPref();
-    var mode = pref === "auto" ? (wideMq.matches ? "rail" : "bottom") : pref;
+    var mode = pref === "auto" ? (railAuto() ? "rail" : "bottom") : pref;
     document.documentElement.setAttribute("data-nav", mode);
     // 設定欄・選択シートのボタンは、描き直さずに印だけ付け替える（取り込み欄の入力を消さない）
     var btns = document.querySelectorAll('[data-action="set-nav-pref"]');
     for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("active", btns[i].dataset.pref === pref);
     var notes = document.querySelectorAll(".nav-pref-note");
     for (var j = 0; j < notes.length; j++) notes[j].textContent = navPrefNote();
-    updateViewportDebug();
+    updateViewportInfo();
   }
   function setNavPref(p) {
     try { if (p === "auto") localStorage.removeItem(NAV_PREF_KEY); else localStorage.setItem(NAV_PREF_KEY, p); } catch (e) {}
@@ -1757,7 +1780,6 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       '<p class="nav-pref-note">' + escapeHtml(navPrefNote()) + '</p>';
   }
   // 画面の開閉・回転で切り替える
-  if (wideMq.addEventListener) wideMq.addEventListener("change", applyNavLayout); else if (wideMq.addListener) wideMq.addListener(applyNavLayout);
   window.addEventListener("resize", applyNavLayout);
   window.addEventListener("orientationchange", function () { setTimeout(applyNavLayout, 250); });
 
@@ -1792,29 +1814,26 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     if (lpFired && e.target.closest && e.target.closest(".bottom-nav")) { lpFired = false; e.preventDefault(); e.stopPropagation(); }
   }, true);
 
-  // ---- 一時的なデバッグ表示（DEBUG_VIEWPORT）：右の黒い列まで描けているかの確認用。タップで閉じる ----
-  var DEBUG_VIEWPORT = true;
-  var vpDebugClosed = false;
-  function updateViewportDebug() {
-    if (!DEBUG_VIEWPORT || vpDebugClosed || !document.body) return;
+  // ---- 設定の「表示情報」：押したときだけ、画面の大きさ・safe-area・ナビの判定を出す ----
+  var vpInfoOpen = false;
+  function viewportInfoText() {
     var probe = document.querySelector(".vp-probe");
-    if (!probe) {
-      probe = document.createElement("div"); probe.className = "vp-probe"; document.body.appendChild(probe);
-      var edge = document.createElement("div"); edge.className = "vp-edge"; document.body.appendChild(edge);
-      var box = document.createElement("div"); box.className = "vp-debug";
-      box.addEventListener("click", function () { vpDebugClosed = true; box.remove(); edge.remove(); probe.remove(); });
-      document.body.appendChild(box);
-    }
+    if (!probe) { probe = document.createElement("div"); probe.className = "vp-probe"; document.body.appendChild(probe); }
     var cs = getComputedStyle(probe);
     var standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-    document.querySelector(".vp-debug").textContent =
-      "inner  " + window.innerWidth + " x " + window.innerHeight + "\n" +
-      "screen " + screen.width + " x " + screen.height + "\n" +
-      "docEl  " + document.documentElement.clientWidth + " x " + document.documentElement.clientHeight + "\n" +
-      "safe T/R/B/L " + [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft].map(function (v) { return parseFloat(v); }).join(" / ") + "\n" +
-      "dpr " + window.devicePixelRatio + "  " + (standalone ? "ホーム画面" : "Safari") + "\n" +
-      "nav " + document.documentElement.getAttribute("data-nav") + "（設定: " + navPref() + "）\n" +
-      "（タップで閉じる）";
+    return "inner  " + window.innerWidth + " x " + window.innerHeight + "\n" +
+      "screen " + screen.width + " x " + screen.height + "（差 " + (screen.width - window.innerWidth) + "px）\n" +
+      "safe 上/右/下/左 " + [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft].map(function (v) { return parseFloat(v); }).join(" / ") + "\n" +
+      "dpr " + window.devicePixelRatio + "・" + (standalone ? "ホーム画面から" : "Safari") + "\n" +
+      "ナビ " + (document.documentElement.getAttribute("data-nav") === "rail" ? "右" : "下") + "（設定: " + { auto: "自動", rail: "右ナビ", bottom: "下ナビ" }[navPref()] + "）";
+  }
+  function updateViewportInfo() {
+    var el = document.getElementById("vp-info");
+    if (!el) return;
+    el.hidden = !vpInfoOpen;
+    if (vpInfoOpen) el.textContent = viewportInfoText();
+    var btn = document.querySelector('[data-action="toggle-vp-info"]');
+    if (btn) btn.textContent = vpInfoOpen ? "表示情報を閉じる" : "表示情報";
   }
 
   // 動きの合図：操作ごとに1回だけ出す（描き直しのたびに動かないように）
@@ -1848,7 +1867,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       lastProgressPct = to;
     }
     if (state.view === "list") attachListView();
-    if (state.view === "import") attachImportView();
+    if (state.view === "import") { attachImportView(); updateViewportInfo(); }
   }
 
   function setView(view) {
@@ -1865,6 +1884,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       case "toggle-theme": cycleTheme(); return;
       case "set-nav-pref": setNavPref(target.dataset.pref); return;
       case "close-nav-sheet": closeNavSheet(); return;
+      case "toggle-vp-info": vpInfoOpen = !vpInfoOpen; updateViewportInfo(); return;
       case "goto-import": setView("import"); return;
       case "restart-quiz": case "next-session": startQuizSession("normal"); cue("next"); render(); return;
       case "retry-missed": startQuizSession("retry", missedKeys(state.quiz)); cue("next"); render(); return;
