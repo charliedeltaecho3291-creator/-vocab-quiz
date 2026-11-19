@@ -16,6 +16,11 @@
   // 夜に開いたとき一瞬明るくならないよう、本体より先にテーマを決める（保存がなければiPhoneの設定に合わせる）
   // 2026-11-19〜 黒いガラスの表示に固定（ライト表示と切り替えボタンはやめた）
   document.documentElement.setAttribute("data-theme", "dark");
+  // ナビの位置：新しいキー navLayoutPref（auto / rail / bottom）。自動は画面幅500px以上で右の縦ナビ
+  try {
+    var np = localStorage.getItem("navLayoutPref") || "auto";
+    document.documentElement.setAttribute("data-nav", np === "rail" || np === "bottom" ? np : (window.matchMedia("(min-width: 500px)").matches ? "rail" : "bottom"));
+  } catch (e) { document.documentElement.setAttribute("data-nav", "bottom"); }
 </script>
 <style>
   :root {
@@ -349,6 +354,52 @@
   .import-actions { display: flex; gap: 10px; }
   .import-actions .btn { margin-top: 10px; }
   .message .btn { margin-top: 8px; }
+
+  /* ---- ナビの位置（2026-11-19）----
+     html[data-nav="rail"]：右の縦ナビ（画面幅500px以上 or 手動）。"bottom"：下のタブ。
+     描き直しなしで data-nav を付け替えるだけで切り替わる */
+  .bottom-nav { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+  html[data-nav="rail"] { --rail-w: 68px; --rail-gap: 10px; }
+  html[data-nav="rail"] #app {
+    max-width: none;
+    padding-left: env(safe-area-inset-left);
+    padding-right: calc(var(--rail-w) + var(--rail-gap) * 2 + env(safe-area-inset-right));
+  }
+  html[data-nav="rail"] .app-header, html[data-nav="rail"] .app-main { width: 100%; max-width: 860px; margin-left: auto; margin-right: auto; }
+  html[data-nav="rail"] .app-main { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+  html[data-nav="rail"] .sticky-action { bottom: calc(12px + env(safe-area-inset-bottom)); }
+  html[data-nav="rail"] .question-card.pin-bottom { min-height: calc(100svh - 230px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  html[data-nav="rail"] .session-complete.pin-bottom { min-height: calc(100svh - 160px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  html[data-nav="rail"] .bottom-nav {
+    left: auto; bottom: auto; margin: 0;
+    right: calc(var(--rail-gap) + env(safe-area-inset-right));
+    top: 56%; transform: translateY(-50%);
+    width: var(--rail-w); max-width: none;
+    flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px;
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 999px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 30px rgba(0,0,0,0.45);
+    z-index: 5;
+  }
+  html[data-nav="rail"] .nav-btn { flex: none; width: 56px; height: 56px; padding: 0; justify-content: center; border-radius: 50%; font-size: 0.6rem; gap: 1px; }
+  html[data-nav="rail"] .nav-btn .nav-icon svg { width: 22px; height: 22px; }
+  html[data-nav="rail"] .nav-btn.active { background: rgba(255,255,255,0.14); box-shadow: inset 0 1px 0 rgba(255,255,255,0.25); }
+  html[data-nav="rail"] .nav-btn:active { background: rgba(255,255,255,0.08); }
+
+  /* ナビの長押しで出す「ナビの位置」の選択（#app の外に置くので描き直しで消えない） */
+  .nav-sheet { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-end; justify-content: center; background: rgba(0,0,0,0.45); padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
+  html[data-nav="rail"] .nav-sheet { align-items: center; }
+  .nav-sheet[hidden] { display: none; }
+  .nav-sheet .sheet-card { width: 100%; max-width: 380px; background: rgba(30,30,33,0.92); border: 1px solid rgba(255,255,255,0.18); border-radius: 20px; padding: 16px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 20px 50px rgba(0,0,0,0.5); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); animation: enter-fade .16s ease-out both; }
+  .nav-sheet h2 { text-align: center; margin-bottom: 12px; }
+  .nav-pref-note { font-size: 0.75rem; color: var(--color-text-muted); text-align: center; margin: 8px 0 0; }
+
+  /* ---- 一時的なデバッグ表示（右の黒い列の確認用。確認が終わったら DEBUG_VIEWPORT の部分ごと消す）---- */
+  .vp-probe { position: fixed; left: 0; top: 0; width: 0; height: 0; visibility: hidden; pointer-events: none;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  .vp-debug { position: fixed; z-index: 30; left: calc(6px + env(safe-area-inset-left)); top: calc(6px + env(safe-area-inset-top)); max-width: 240px;
+    font: 10px/1.45 ui-monospace, Menlo, monospace; color: #e6e6e6; background: rgba(0,0,0,0.78); border: 1px solid rgba(255,255,255,0.25); border-radius: 8px; padding: 5px 7px; white-space: pre; }
+  /* アプリが描ける範囲の外枠（赤い点線）。右の黒い列の上に線が来ていれば、そこまで描けている */
+  .vp-edge { position: fixed; inset: 0; z-index: 29; pointer-events: none; outline: 2px dashed rgba(255,120,120,0.7); outline-offset: -2px; }
 </style>
 </head>
 <body>
@@ -1435,6 +1486,11 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       '</label>' +
       '<div id="restore-message" class="message" role="status"></div>' +
       '</section>' +
+      '<section class="card">' +
+      '<h2>③ 表示の設定：ナビの位置</h2>' +
+      '<p class="hint">自動は、画面幅が500px以上なら右の縦ナビ、それより狭ければ下のタブになります。ナビの長押しでも選べます。</p>' +
+      navPrefButtonsHtml() +
+      '</section>' +
       '</div>';
   }
 
@@ -1648,6 +1704,97 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
   }
   if (sysDark.addEventListener) sysDark.addEventListener("change", applyTheme); else if (sysDark.addListener) sysDark.addListener(applyTheme);
 
+  // ---- ナビの位置（右の縦ナビ / 下のタブ / 自動）----
+  // 新しいキー navLayoutPref だけを使う。既存のキーには触れない
+  var NAV_PREF_KEY = "navLayoutPref";
+  var wideMq = window.matchMedia("(min-width: 500px)");
+  function navPref() { try { var v = localStorage.getItem(NAV_PREF_KEY); return v === "rail" || v === "bottom" ? v : "auto"; } catch (e) { return "auto"; } }
+  function navPrefNote() {
+    if (navPref() !== "auto") return "ナビの長押しでも変えられます";
+    return "自動：今の画面幅 " + window.innerWidth + "px → " + (wideMq.matches ? "右ナビ（500px以上）" : "下ナビ（500px未満）");
+  }
+  function applyNavLayout() {
+    var pref = navPref();
+    var mode = pref === "auto" ? (wideMq.matches ? "rail" : "bottom") : pref;
+    document.documentElement.setAttribute("data-nav", mode);
+    // 設定欄・選択シートのボタンは、描き直さずに印だけ付け替える（取り込み欄の入力を消さない）
+    var btns = document.querySelectorAll('[data-action="set-nav-pref"]');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("active", btns[i].dataset.pref === pref);
+    var notes = document.querySelectorAll(".nav-pref-note");
+    for (var j = 0; j < notes.length; j++) notes[j].textContent = navPrefNote();
+    updateViewportDebug();
+  }
+  function setNavPref(p) {
+    try { if (p === "auto") localStorage.removeItem(NAV_PREF_KEY); else localStorage.setItem(NAV_PREF_KEY, p); } catch (e) {}
+    applyNavLayout();
+  }
+  function navPrefButtonsHtml() {
+    var pref = navPref();
+    function b(v, label) { return '<button class="mode-btn ' + (pref === v ? "active" : "") + '" data-action="set-nav-pref" data-pref="' + v + '">' + label + '</button>'; }
+    return '<div class="mode-toggle">' + b("auto", "自動") + b("rail", "右ナビ") + b("bottom", "下ナビ") + '</div>' +
+      '<p class="nav-pref-note">' + escapeHtml(navPrefNote()) + '</p>';
+  }
+  // 画面の開閉・回転で切り替える
+  if (wideMq.addEventListener) wideMq.addEventListener("change", applyNavLayout); else if (wideMq.addListener) wideMq.addListener(applyNavLayout);
+  window.addEventListener("resize", applyNavLayout);
+  window.addEventListener("orientationchange", function () { setTimeout(applyNavLayout, 250); });
+
+  // ナビの長押し（0.5秒）で選択シートを開く。長押しのあとの「タブ切り替え」は起こさない
+  var lpTimer = null, lpStart = null, lpFired = false;
+  function openNavSheet() {
+    var sheet = document.getElementById("nav-sheet");
+    if (!sheet) {
+      sheet = document.createElement("div");
+      sheet.id = "nav-sheet"; sheet.className = "nav-sheet";
+      sheet.setAttribute("role", "dialog"); sheet.setAttribute("aria-label", "ナビの位置");
+      document.body.appendChild(sheet);
+    }
+    sheet.innerHTML = '<div class="sheet-card"><h2>ナビの位置</h2>' + navPrefButtonsHtml() +
+      '<button class="btn btn-secondary" data-action="close-nav-sheet">閉じる</button></div>';
+    sheet.hidden = false;
+  }
+  function closeNavSheet() { var s = document.getElementById("nav-sheet"); if (s) s.hidden = true; }
+  document.addEventListener("pointerdown", function (e) {
+    if (!e.target.closest || !e.target.closest(".bottom-nav")) return;
+    lpFired = false; lpStart = { x: e.clientX, y: e.clientY };
+    clearTimeout(lpTimer);
+    lpTimer = setTimeout(function () { lpFired = true; lpTimer = null; openNavSheet(); }, 500);
+  });
+  document.addEventListener("pointermove", function (e) {
+    if (lpTimer && lpStart && (Math.abs(e.clientX - lpStart.x) > 10 || Math.abs(e.clientY - lpStart.y) > 10)) { clearTimeout(lpTimer); lpTimer = null; }
+  });
+  ["pointerup", "pointercancel"].forEach(function (t) { document.addEventListener(t, function () { clearTimeout(lpTimer); lpTimer = null; }); });
+  document.addEventListener("contextmenu", function (e) { if (e.target.closest && e.target.closest(".bottom-nav")) e.preventDefault(); });
+  // 長押しのあとに来るクリックは捨てる（ほかの処理より先に捕まえる）
+  document.addEventListener("click", function (e) {
+    if (lpFired && e.target.closest && e.target.closest(".bottom-nav")) { lpFired = false; e.preventDefault(); e.stopPropagation(); }
+  }, true);
+
+  // ---- 一時的なデバッグ表示（DEBUG_VIEWPORT）：右の黒い列まで描けているかの確認用。タップで閉じる ----
+  var DEBUG_VIEWPORT = true;
+  var vpDebugClosed = false;
+  function updateViewportDebug() {
+    if (!DEBUG_VIEWPORT || vpDebugClosed || !document.body) return;
+    var probe = document.querySelector(".vp-probe");
+    if (!probe) {
+      probe = document.createElement("div"); probe.className = "vp-probe"; document.body.appendChild(probe);
+      var edge = document.createElement("div"); edge.className = "vp-edge"; document.body.appendChild(edge);
+      var box = document.createElement("div"); box.className = "vp-debug";
+      box.addEventListener("click", function () { vpDebugClosed = true; box.remove(); edge.remove(); probe.remove(); });
+      document.body.appendChild(box);
+    }
+    var cs = getComputedStyle(probe);
+    var standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+    document.querySelector(".vp-debug").textContent =
+      "inner  " + window.innerWidth + " x " + window.innerHeight + "\n" +
+      "screen " + screen.width + " x " + screen.height + "\n" +
+      "docEl  " + document.documentElement.clientWidth + " x " + document.documentElement.clientHeight + "\n" +
+      "safe T/R/B/L " + [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft].map(function (v) { return parseFloat(v); }).join(" / ") + "\n" +
+      "dpr " + window.devicePixelRatio + "  " + (standalone ? "ホーム画面" : "Safari") + "\n" +
+      "nav " + document.documentElement.getAttribute("data-nav") + "（設定: " + navPref() + "）\n" +
+      "（タップで閉じる）";
+  }
+
   // 動きの合図：操作ごとに1回だけ出す（描き直しのたびに動かないように）
   var motionCue = "";
   var lastProgressPct = null;
@@ -1694,6 +1841,8 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     switch (action) {
       case "nav": setView(target.dataset.view); return;
       case "toggle-theme": cycleTheme(); return;
+      case "set-nav-pref": setNavPref(target.dataset.pref); return;
+      case "close-nav-sheet": closeNavSheet(); return;
       case "goto-import": setView("import"); return;
       case "restart-quiz": case "next-session": startQuizSession("normal"); cue("next"); render(); return;
       case "retry-missed": startQuizSession("retry", missedKeys(state.quiz)); cue("next"); render(); return;
@@ -1723,6 +1872,9 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     }
   });
 
+  // 選択シートの外側（暗い所）を押したら閉じる
+  document.addEventListener("click", function (e) { if (e.target && e.target.id === "nav-sheet") closeNavSheet(); });
+
   document.addEventListener("change", function (e) {
     if (e.target && e.target.id === "restore-file-input") {
       handleRestoreFile(e);
@@ -1749,6 +1901,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
   document.addEventListener("touchstart", function () {}, { passive: true });
 
   applyTheme();
+  applyNavLayout();
   init();
 })();
 </script>
