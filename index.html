@@ -16,10 +16,10 @@
   // 夜に開いたとき一瞬明るくならないよう、本体より先にテーマを決める（保存がなければiPhoneの設定に合わせる）
   // 2026-11-19〜 黒いガラスの表示に固定（ライト表示と切り替えボタンはやめた）
   document.documentElement.setAttribute("data-theme", "dark");
-  // ナビの位置：新しいキー navLayoutPref（auto / rail / bottom）。自動は画面幅500px以上で右の縦ナビ
+  // ナビの位置：新しいキー navLayoutPref（auto / rail / bottom）。自動は画面幅450px以上で右の縦ナビ
   try {
     var np = localStorage.getItem("navLayoutPref") || "auto";
-    document.documentElement.setAttribute("data-nav", np === "rail" || np === "bottom" ? np : (window.matchMedia("(min-width: 500px)").matches ? "rail" : "bottom"));
+    document.documentElement.setAttribute("data-nav", np === "rail" || np === "bottom" ? np : (window.matchMedia("(min-width: 450px)").matches ? "rail" : "bottom"));
   } catch (e) { document.documentElement.setAttribute("data-nav", "bottom"); }
 </script>
 <style>
@@ -356,7 +356,7 @@
   .message .btn { margin-top: 8px; }
 
   /* ---- ナビの位置（2026-11-19）----
-     html[data-nav="rail"]：右の縦ナビ（画面幅500px以上 or 手動）。"bottom"：下のタブ。
+     html[data-nav="rail"]：右の縦ナビ（画面幅450px以上 or 手動）。"bottom"：下のタブ。
      描き直しなしで data-nav を付け替えるだけで切り替わる */
   .bottom-nav { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
   html[data-nav="rail"] { --rail-w: 68px; --rail-gap: 10px; }
@@ -384,6 +384,28 @@
   html[data-nav="rail"] .nav-btn .nav-icon svg { width: 22px; height: 22px; }
   html[data-nav="rail"] .nav-btn.active { background: rgba(255,255,255,0.14); box-shadow: inset 0 1px 0 rgba(255,255,255,0.25); }
   html[data-nav="rail"] .nav-btn:active { background: rgba(255,255,255,0.08); }
+
+  /* ---- 画面幅700px以上（Duoを開いたとき）：2列には分けず、同じ構成のまま横に広げる ----
+     見た目だけの切り替えなので、開閉してもクイズの途中経過はそのまま */
+  @media (min-width: 700px) {
+    html, body { font-size: 18px; }
+    #app { max-width: none; }
+    html[data-nav] .app-header, html[data-nav] .app-main { width: 100%; max-width: 1120px; margin-left: auto; margin-right: auto; }
+    html[data-nav="bottom"] .bottom-nav { max-width: 560px; }
+    /* クイズ：モード切り替え・進み具合・問題カードは最大720pxで中央 */
+    .quiz-view > * { width: 100%; max-width: 720px; margin-left: auto; margin-right: auto; }
+    /* 選択肢は2×2で、スクロールなしで全部見える */
+    .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .choice-btn { min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    /* 一覧：2〜3列のカード */
+    #list-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); align-items: start; gap: 12px; }
+    #list-results > .list-group-header, #list-results > .more-btn, #list-results > .empty-msg { grid-column: 1 / -1; }
+    /* 統計：サマリーとランキングを横に並べる */
+    .stats-view .today-line { gap: 6px; font-size: 0.8rem; }
+    .stats-view { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.5fr); align-items: start; gap: 14px; }
+    /* 取り込み：カードを2列に */
+    .import-view { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-items: start; gap: 14px; }
+  }
 
   /* ナビの長押しで出す「ナビの位置」の選択（#app の外に置くので描き直しで消えない） */
   .nav-sheet { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-end; justify-content: center; background: rgba(0,0,0,0.45); padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
@@ -1488,7 +1510,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       '</section>' +
       '<section class="card">' +
       '<h2>③ 表示の設定：ナビの位置</h2>' +
-      '<p class="hint">自動は、画面幅が500px以上なら右の縦ナビ、それより狭ければ下のタブになります。ナビの長押しでも選べます。</p>' +
+      '<p class="hint">自動は、画面幅が450px以上なら右の縦ナビ、それより狭ければ下のタブになります。ナビの長押しでも選べます。</p>' +
       navPrefButtonsHtml() +
       '</section>' +
       '</div>';
@@ -1707,11 +1729,11 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
   // ---- ナビの位置（右の縦ナビ / 下のタブ / 自動）----
   // 新しいキー navLayoutPref だけを使う。既存のキーには触れない
   var NAV_PREF_KEY = "navLayoutPref";
-  var wideMq = window.matchMedia("(min-width: 500px)");
+  var wideMq = window.matchMedia("(min-width: 450px)");
   function navPref() { try { var v = localStorage.getItem(NAV_PREF_KEY); return v === "rail" || v === "bottom" ? v : "auto"; } catch (e) { return "auto"; } }
   function navPrefNote() {
     if (navPref() !== "auto") return "ナビの長押しでも変えられます";
-    return "自動：今の画面幅 " + window.innerWidth + "px → " + (wideMq.matches ? "右ナビ（500px以上）" : "下ナビ（500px未満）");
+    return "自動：今の画面幅 " + window.innerWidth + "px → " + (wideMq.matches ? "右ナビ（450px以上）" : "下ナビ（450px未満）");
   }
   function applyNavLayout() {
     var pref = navPref();
