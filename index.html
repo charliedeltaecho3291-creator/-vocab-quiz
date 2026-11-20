@@ -263,7 +263,7 @@
   .arrange-yours .toks { display: flex; flex-wrap: wrap; gap: 6px; }
   .arrange-yours .tok { padding: 4px 8px; border-radius: 8px; border: 1px solid var(--color-border); font-weight: 600; font-size: 0.9rem; }
   .arrange-yours .tok.wrong { border-color: var(--color-error); color: var(--color-error); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
-  .arrange-controls .btn { margin-top: 0; }
+  .arrange-controls .btn { margin-top: 0; white-space: nowrap; padding-left: 6px; padding-right: 6px; }
 
   .session-complete { text-align: center; }
   .complete-title { font-size: 1.3rem; font-weight: 700; color: var(--color-primary-dark); margin: 4px 0 6px; }
@@ -893,7 +893,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
         return {
           kind: q.kind, queue: q.queue.map(wkey), totalUnique: q.totalUnique, masteredCount: q.masteredCount,
           questionNumber: q.questionNumber, current: q.current ? wkey(q.current) : null, answered: q.answered,
-          revealed: q.revealed, selectedChoice: q.selectedChoice, isCorrect: q.isCorrect,
+          revealed: q.revealed, selectedChoice: q.selectedChoice, isCorrect: q.isCorrect, gaveUp: !!q.gaveUp,
           choices: q.choices.map(wkey), arrangeOrder: q.arrangeOrder, arrangeSelected: q.arrangeSelected,
           finished: q.finished, firstTry: q.firstTry
         };
@@ -917,7 +917,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
         queue: (r.queue || []).map(function (k) { return byKey[k]; }).filter(Boolean),
         totalUnique: r.totalUnique || 0, masteredCount: r.masteredCount || 0, questionNumber: r.questionNumber || 0,
         current: cur, answered: !!(cur && r.answered), revealed: !!(cur && r.revealed),
-        selectedChoice: r.selectedChoice || null, isCorrect: r.isCorrect,
+        selectedChoice: r.selectedChoice || null, isCorrect: r.isCorrect, gaveUp: !!r.gaveUp,
         choices: (r.choices || []).map(function (k) { return byKey[k]; }).filter(Boolean),
         arrangeTokens: [], arrangeOrder: r.arrangeOrder || [], arrangeSelected: r.arrangeSelected || [],
         finished: !!r.finished, firstTry: r.firstTry || {}
@@ -950,7 +950,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     }
     q.current = q.queue.shift();
     q.questionNumber++;
-    q.answered = false;
+    q.answered = false; q.gaveUp = false;
     q.revealed = false;
     q.selectedChoice = null;
     q.isCorrect = null;
@@ -1006,7 +1006,18 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     var answerText = q.arrangeSelected.map(function (id) { return q.arrangeTokens[id].text; }).join(" ");
     var correctText = q.arrangeTokens.map(function (t) { return t.text; }).join(" ");
     q.isCorrect = answerText === correctText;
+    q.gaveUp = false;
     noteResult(q.isCorrect);
+  }
+
+  // わからないときは、組み途中でも正解を一気に表示する（ミス扱いで、あとでもう一度出る）
+  function revealArrange() {
+    var q = state.quiz;
+    if (q.answered) return;
+    q.answered = true;
+    q.isCorrect = false;
+    q.gaveUp = true;
+    noteResult(false);
   }
 
   function selectArrangeToken(id) {
@@ -1220,6 +1231,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
         '<div class="arrange-controls">' +
         '<button class="btn btn-outline" data-action="arrange-undo"' + (q.arrangeSelected.length ? '' : ' disabled') + '>1つ戻す</button>' +
         '<button class="btn btn-outline" data-action="arrange-clear"' + (q.arrangeSelected.length ? '' : ' disabled') + '>クリア</button>' +
+        '<button class="btn btn-outline" data-action="arrange-reveal">答えを見る</button>' +
         '</div>' +
         '<button class="btn btn-primary" data-action="arrange-submit"' + (allSelected ? '' : ' disabled') + '>答え合わせ</button>' +
         '</div>' +
@@ -1228,7 +1240,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
 
     // 不正解なら、自分が組んだ文を出して、位置が違う単語に印を付ける
     var yours = "";
-    if (!q.isCorrect) {
+    if (!q.isCorrect && !q.gaveUp) {
       // 印は「最初にずれた所」だけに付ける
       var firstWrong = -1;
       q.arrangeSelected.forEach(function (id, pos) { if (firstWrong < 0 && q.arrangeTokens[id].text !== q.arrangeTokens[pos].text) firstWrong = pos; });
@@ -1240,7 +1252,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     }
     return '<div class="card question-card pin-bottom">' +
       '<div class="japanese-text">' + escapeHtml(w.exampleJa) + '</div>' +
-      verdictHtml(q.isCorrect) +
+      (q.gaveUp ? '<div class="result-text incorrect">' + ICON_CROSS + '答えを表示しました</div>' : verdictHtml(q.isCorrect)) +
       yours +
       answerDetailHtml(w, false, true) +
       '<button class="btn btn-primary sticky-action" data-action="next-question">次の問題へ</button>' +
@@ -1909,6 +1921,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       case "arrange-undo": undoArrangeToken(); saveSessions(); render(); return;
       case "arrange-clear": clearArrangeTokens(); saveSessions(); render(); return;
       case "arrange-submit": submitArrange(); cue("answer"); render(); return;
+      case "arrange-reveal": revealArrange(); cue("answer"); render(); return;
       case "import-words": handleImportWords(); return;
       case "export-words": handleExportWords(); return;
     }
