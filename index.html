@@ -361,11 +361,12 @@
      html[data-nav="rail"]：右の縦ナビ（画面幅450px以上 or 手動）。"bottom"：下のタブ。
      描き直しなしで data-nav を付け替えるだけで切り替わる */
   .bottom-nav { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-  html[data-nav="rail"] { --rail-w: 68px; --rail-gap: 10px; }
+  /* 右ナビ（2026-11-20 ドック）：幅 = ボタン48 + 余白8×2 + 枠1×2 = 66px。画面の右端から12px内側（safe-area も足す） */
+  html[data-nav="rail"] { --rail-w: 66px; --rail-gap: 12px; }
   html[data-nav="rail"] #app {
     max-width: none;
     padding-left: env(safe-area-inset-left);
-    padding-right: calc(var(--rail-w) + var(--rail-gap) * 2 + env(safe-area-inset-right));
+    padding-right: calc(var(--rail-w) + var(--rail-gap) + 10px + env(safe-area-inset-right));
   }
   html[data-nav="rail"] .app-header, html[data-nav="rail"] .app-main { width: 100%; max-width: 860px; margin-left: auto; margin-right: auto; }
   html[data-nav="rail"] .app-main { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
@@ -377,15 +378,54 @@
     right: calc(var(--rail-gap) + env(safe-area-inset-right));
     top: 56%; transform: translateY(-50%);
     width: var(--rail-w); max-width: none;
-    flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px;
-    border: 1px solid #33363d; border-radius: 999px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.45);
-    z-index: 5;
+    flex-direction: column; align-items: center; gap: 6px; padding: 8px;
+    background: #1a1c21; border: 1px solid #33363d; border-radius: 32px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.5);
+    z-index: 5; touch-action: none;   /* なぞっている間に画面がスクロールしないように */
   }
-  html[data-nav="rail"] .nav-btn { flex: none; width: 56px; height: 56px; padding: 0; justify-content: center; border-radius: 50%; font-size: 12px; gap: 1px; letter-spacing: -0.03em; }
-  html[data-nav="rail"] .nav-btn .nav-icon svg { width: 22px; height: 22px; }
-  html[data-nav="rail"] .nav-btn.active { background: #2e3138; }
-  html[data-nav="rail"] .nav-btn:active { background: #24272d; }
+  html[data-nav="rail"] .nav-btn {
+    position: relative; flex: none; width: 48px; height: 48px; padding: 0; justify-content: center; border-radius: 50%;
+    color: #8d939d; background: transparent !important;
+    transition: transform .12s ease-out, margin .12s ease-out, color .12s ease-out;
+  }
+  html[data-nav="rail"] .nav-btn:active { transform: none; }
+  html[data-nav="rail"] .nav-btn > span:not(.nav-icon):not(.nav-badge):not(.spark) { display: none; }   /* 名前はなぞったときの吹き出しだけ */
+  html[data-nav="rail"] .nav-btn .nav-icon { position: relative; z-index: 1; }
+  html[data-nav="rail"] .nav-btn .nav-icon svg { width: 22px; height: 22px; overflow: visible; }
+  /* 選択中：白い丸がボタンいっぱい、アイコンは黒 */
+  html[data-nav="rail"] .nav-btn::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: #ffffff; transform: scale(0); }
+  html[data-nav="rail"] .nav-btn.active::before { transform: scale(1); }
+  html[data-nav="rail"] .nav-btn.active { color: #0a0a0a; }
+  /* 未取り込みの件数バッジ（件数が取れるときだけ出す） */
+  .nav-badge { position: absolute; top: -2px; right: -2px; z-index: 2; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: #ff6b6b; color: #ffffff; font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; }
+  .nav-btn { position: relative; }
+  /* なぞったときの名前の吹き出し（ボタンの左） */
+  .dock-tip { display: none; }
+  html[data-nav="rail"] .dock-tip {
+    display: block; position: absolute; right: calc(100% + 12px); top: 0; transform: translateY(-50%);
+    background: #ffffff; color: #0a0a0a; font-size: 13px; font-weight: 700; padding: 6px 10px; border-radius: 8px;
+    white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .12s ease-out;
+  }
+  html[data-nav="rail"] .dock-tip::after { content: ""; position: absolute; left: 100%; top: 50%; transform: translateY(-50%); border: 5px solid transparent; border-left-color: #ffffff; }
+  html[data-nav="rail"] .dock-tip.show { opacity: 1; }
+  /* 選んだときの演出（右ナビだけ） */
+  .spark { display: none; }
+  html[data-nav="rail"] .spark { display: block; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--c); z-index: 2; pointer-events: none; opacity: 0; animation: spark .45s ease-out; }
+  @keyframes spark { 0% { opacity: 1; transform: rotate(var(--a)) translateX(10px) scale(1); } 100% { opacity: 0; transform: rotate(var(--a)) translateX(36px) scale(.4); } }
+  html[data-nav="rail"] .nav-btn.pop::before { animation: navfill .25s cubic-bezier(.3,1.5,.5,1); }
+  @keyframes navfill { from { transform: scale(0); } to { transform: scale(1); } }
+  html[data-nav="rail"] .nav-btn.pop { animation: navjump .45s ease-out; }
+  @keyframes navjump { 30% { transform: translateX(-14px); } 65% { transform: translateX(2px); } 100% { transform: translateX(0); } }
+  html[data-nav="rail"] .nav-btn.pop[data-view="quiz"] svg { transform-origin: 20% 85%; animation: ic-write .5s ease-in-out; }
+  @keyframes ic-write { 20% { transform: rotate(-14deg); } 40% { transform: rotate(10deg); } 60% { transform: rotate(-8deg); } 80% { transform: rotate(5deg); } }
+  html[data-nav="rail"] .nav-btn.pop[data-view="list"] svg { animation: ic-slide .45s cubic-bezier(.2,.9,.3,1); }
+  @keyframes ic-slide { from { transform: translateX(14px); opacity: 0; } }
+  html[data-nav="rail"] .nav-btn.pop[data-view="stats"] svg .bars { transform-box: fill-box; transform-origin: 50% 100%; animation: ic-grow .45s cubic-bezier(.3,1.4,.5,1); }
+  @keyframes ic-grow { from { transform: scaleY(0); } }
+  html[data-nav="rail"] .nav-btn.pop[data-view="import"] svg .arrow { animation: ic-drop .5s ease-out; }
+  @keyframes ic-drop { 0% { transform: translateY(-10px); opacity: 0; } 55% { transform: translateY(2px); opacity: 1; } 75% { transform: translateY(-2px); } 100% { transform: translateY(0); } }
+  /* 画面の中身：切り替えたとき下から少しフェードイン */
+  #app[data-motion="view"] .view { animation: settle .2s var(--ease-out) both; }
 
   /* ---- 画面幅700px以上（Duoを開いたとき）：2列には分けず、同じ構成のまま横に広げる ----
      見た目だけの切り替えなので、開閉してもクイズの途中経過はそのまま */
@@ -425,15 +465,7 @@
 
   /* ---- 幅が狭いとき（450px未満、Duoを閉じたとき）の右ナビ：コンパクトに、アプリ領域の右端へぴったり ---- */
   @media (max-width: 449px) {
-    html[data-nav="rail"] { --rail-w: 56px; --rail-gap: 0px; }
-    html[data-nav="rail"] #app { padding-right: calc(var(--rail-w) + 4px + env(safe-area-inset-right)); }
-    html[data-nav="rail"] .bottom-nav {
-      right: env(safe-area-inset-right); width: var(--rail-w); padding: 8px 4px; gap: 4px;
-      border-right: none; border-radius: 22px 0 0 22px;   /* 右側は角を付けず、右の時刻の列とつながって見えるように */
-      background: #121317;
-    }
-    html[data-nav="rail"] .nav-btn { width: 48px; height: 50px; border-radius: 16px; font-size: 12px; letter-spacing: -0.05em; }
-    html[data-nav="rail"] .nav-btn .nav-icon svg { width: 21px; height: 21px; }
+    html[data-nav="rail"] #app { padding-right: calc(var(--rail-w) + var(--rail-gap) + 6px + env(safe-area-inset-right)); }
     /* 選択肢の文字が窮屈にならないよう、左右の余白を少し減らす */
     html[data-nav="rail"] .app-main { padding-left: 10px; padding-right: 6px; }
     html[data-nav="rail"] .card { padding: 16px 12px; }
@@ -451,6 +483,7 @@
   /* 今日の進み具合：左にリング、右に数値とカレンダー */
   .daily-card { display: flex; align-items: center; gap: 14px; border-radius: 20px; padding: 14px 16px; }
   @media (max-width: 449px) { .daily-card { gap: 10px; padding: 14px 12px; } .dstats { gap: 4px 12px; } }
+  @media (max-width: 359px) { html[data-nav="rail"] .rings { width: 84px; height: 84px; } html[data-nav="rail"] .daily-card { gap: 8px; } }
   .rings { flex-shrink: 0; width: 100px; height: 100px; transform: rotate(-90deg); }
   .rings circle { fill: none; stroke-width: 11; }
   .ring-arc { stroke-linecap: round; transition: stroke-dashoffset .35s var(--ease-out); }
@@ -2148,6 +2181,111 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
   function cue(name) { motionCue = name; }
   function afterQuizStep() { return state.quiz.finished ? "complete" : "next"; }
 
+  // ---- ナビ（下のタブ / 右のドック）----
+  var NAV_ITEMS = [
+    { view: "quiz", label: "クイズ", icon: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>' },
+    { view: "list", label: "一覧", icon: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01" stroke-width="2.6"/>' },
+    { view: "stats", label: "統計", icon: '<path d="M3 20h18"/><path class="bars" d="M7 16v-5M12 16V6M17 16v-8"/>' },
+    { view: "import", label: "取り込み", icon: '<path class="arrow" d="M12 4v10M7.5 10l4.5 4.5 4.5-4.5"/><path d="M4 16v3.5h16V16"/>' }
+  ];
+  var SPARK_COLORS = ["#3ddc7e", "#ffc04d", "#6fa8ff", "#ffffff"];
+  var navAnim = null;   // 選んだ直後の1回だけ演出を付ける { view, burst }
+  // 「取り込み」のバッジ：未取り込みの件数を持つデータが今はないので 0（＝出さない）。件数が取れるようになったらここで返す
+  function importBadgeCount() { return 0; }
+
+  function navHtml() {
+    var anim = navAnim; navAnim = null;
+    return '<nav class="bottom-nav" aria-label="画面の切り替え">' +
+      NAV_ITEMS.map(function (it) {
+        var active = state.view === it.view, pop = active && anim && anim.view === it.view;
+        var sparks = "";
+        if (pop && anim.burst) for (var i = 0; i < 8; i++) sparks += '<span class="spark" style="--a:' + (i * 45 + 22) + 'deg;--c:' + SPARK_COLORS[i % 4] + '"></span>';
+        var badge = it.view === "import" && importBadgeCount() > 0 ? '<span class="nav-badge">' + importBadgeCount() + '</span>' : '';
+        return '<button class="nav-btn' + (active ? ' active' : '') + (pop ? ' pop' : '') + '" data-action="nav" data-view="' + it.view + '" aria-label="' + it.label + '"' + (active ? ' aria-current="page"' : '') + '>' +
+          '<span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24">' + it.icon + '</svg></span><span>' + it.label + '</span>' + badge + sparks + '</button>';
+      }).join("") +
+      '<div class="dock-tip" aria-hidden="true"></div>' +
+      '</nav>';
+  }
+
+  function navigateTo(view) {
+    navAnim = { view: view, burst: state.view !== view };
+    if (state.view !== view) cue("view");
+    setView(view);
+  }
+
+  // ---- ドック：右ナビの上を指でなぞると、指に近いボタンほど大きくなる（最大1.55倍、90px離れると元の大きさ）----
+  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var dock = null, dockSwallowUntil = 0;
+  function isRail() { return document.documentElement.getAttribute("data-nav") === "rail"; }
+  function dockBegin(nav) {
+    var btns = Array.prototype.slice.call(nav.querySelectorAll(".nav-btn"));
+    btns.forEach(function (b) { b.style.transform = ""; b.style.margin = ""; });
+    dock = { nav: nav, btns: btns, centers: btns.map(function (b) { var r = b.getBoundingClientRect(); return r.top + r.height / 2; }), near: -1, touch: false, moved: false, startY: 0 };
+  }
+  function dockNearest(y) {
+    var best = 0, bd = Infinity;
+    dock.centers.forEach(function (c, i) { var d = Math.abs(y - c); if (d < bd) { bd = d; best = i; } });
+    return best;
+  }
+  function dockUpdate(y) {
+    if (!dock) return;
+    var magnify = !reduceMotion.matches;
+    dock.btns.forEach(function (b, i) {
+      var sc = magnify ? 1 + 0.55 * Math.max(0, 1 - Math.abs(y - dock.centers[i]) / 90) : 1;
+      b.style.transform = sc > 1 ? "scale(" + sc.toFixed(3) + ")" : "";
+      b.style.margin = sc > 1 ? ((sc - 1) * 24).toFixed(1) + "px 0" : "";   // 大きくなった分だけ上下の間隔も広げる
+    });
+    var n = dockNearest(y), tip = dock.nav.querySelector(".dock-tip"), btn = dock.btns[n];
+    dock.near = n;
+    if (tip && btn) {
+      tip.textContent = NAV_ITEMS[n].label;
+      tip.style.top = (btn.offsetTop + btn.offsetHeight / 2) + "px";
+      tip.classList.add("show");
+    }
+  }
+  function dockEnd() {
+    if (!dock) return;
+    var d = dock; dock = null;
+    d.btns.forEach(function (b) { b.style.transition = "transform .18s ease-out, margin .18s ease-out, color .12s ease-out"; b.style.transform = ""; b.style.margin = ""; });
+    var tip = d.nav.querySelector(".dock-tip"); if (tip) tip.classList.remove("show");
+    return d;
+  }
+  document.addEventListener("pointerdown", function (e) {
+    var nav = e.target.closest && e.target.closest(".bottom-nav");
+    if (!nav || !isRail() || e.pointerType === "mouse") return;
+    dockBegin(nav);
+    dock.touch = true; dock.startY = e.clientY;
+    try { nav.setPointerCapture(e.pointerId); } catch (err) {}
+    dockUpdate(e.clientY);
+  });
+  document.addEventListener("pointermove", function (e) {
+    if (!isRail()) return;
+    if (e.pointerType === "mouse") {
+      // PC：マウスを乗せるだけで拡大
+      var nav = e.target.closest && e.target.closest(".bottom-nav");
+      if (nav) { if (!dock || dock.nav !== nav) dockBegin(nav); dockUpdate(e.clientY); }
+      else if (dock && !dock.touch) dockEnd();
+      return;
+    }
+    if (dock && dock.touch) {
+      if (Math.abs(e.clientY - dock.startY) > 6) dock.moved = true;
+      dockUpdate(e.clientY);
+    }
+  });
+  document.addEventListener("pointerup", function (e) {
+    if (!dock || !dock.touch) return;
+    var d = dockEnd();
+    if (lpFired) return;   // 長押しで「ナビの位置」を開いたときは選ばない
+    var view = NAV_ITEMS[d.near >= 0 ? d.near : 0].view;
+    dockSwallowUntil = Date.now() + 500;   // このあと来るクリックで二重に切り替えない
+    navigateTo(view);
+  });
+  document.addEventListener("pointercancel", function () { if (dock && dock.touch) dockEnd(); });
+  document.addEventListener("click", function (e) {
+    if (Date.now() < dockSwallowUntil && e.target.closest && e.target.closest(".bottom-nav")) { dockSwallowUntil = 0; e.preventDefault(); e.stopPropagation(); }
+  }, true);
+
   function render() {
     var app = document.getElementById("app");
     app.dataset.motion = motionCue;
@@ -2155,12 +2293,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     app.innerHTML =
       '<header class="app-header"><span class="sync-badge" id="sync-badge" role="status">' + escapeHtml(syncBadgeText()) + '</span><h1>英単語クイズ</h1>' + themeButtonHtml() + '</header>' +
       '<main class="app-main">' + viewHtml() + '</main>' +
-      '<nav class="bottom-nav">' +
-      '<button class="nav-btn ' + (state.view === "quiz" ? "active" : "") + '" data-action="nav" data-view="quiz"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></span><span>クイズ</span></button>' +
-      '<button class="nav-btn ' + (state.view === "list" ? "active" : "") + '" data-action="nav" data-view="list"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01" stroke-width="2.6"/></svg></span><span>一覧</span></button>' +
-      '<button class="nav-btn ' + (state.view === "stats" ? "active" : "") + '" data-action="nav" data-view="stats"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M7 16v-5M12 16V6M17 16v-8"/></svg></span><span>統計</span></button>' +
-      '<button class="nav-btn ' + (state.view === "import" ? "active" : "") + '" data-action="nav" data-view="import"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4v10M7.5 10l4.5 4.5 4.5-4.5"/><path d="M4 16v3.5h16V16"/></svg></span><span>取り込み</span></button>' +
-      '</nav>';
+      navHtml();
     // 進み具合の棒は、前の長さからなめらかに伸ばす
     var bar = app.querySelector(".progress-bar span");
     if (bar) {
@@ -2187,7 +2320,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     if (!target) return;
     var action = target.dataset.action;
     switch (action) {
-      case "nav": setView(target.dataset.view); return;
+      case "nav": navigateTo(target.dataset.view); return;
       case "toggle-theme": cycleTheme(); return;
       case "set-nav-pref": setNavPref(target.dataset.pref); return;
       case "close-nav-sheet": closeNavSheet(); return;
