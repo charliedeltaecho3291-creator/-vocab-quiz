@@ -540,6 +540,44 @@
   /* 設定：1日の目標 */
   .goal-select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--color-border); background: #22252b; color: var(--color-text); font-size: 16px; }
 
+  /* ==== 右ナビは必要なときだけ（2026-11-20）====
+     普段は右端の細いつまみだけ。つまみのタップで右から滑り出し、選んで0.7秒後・3秒操作なし・ほかの所をタップで隠れる。
+     右端からのスワイプは使わない（システムの操作とぶつかる）。下のタブ（data-nav="bottom"）には関係しない */
+  html[data-nav="rail"] #app { transition: padding-right .22s ease-out; }
+  html[data-nav="rail"]:not(.rail-open) #app { padding-right: calc(20px + env(safe-area-inset-right)); }
+  html[data-nav="rail"] .bottom-nav {
+    transform: translate(calc(100% + var(--rail-gap) + env(safe-area-inset-right) + 24px), -50%);
+    visibility: hidden;
+    transition: transform .2s ease-in, visibility 0s linear .2s;
+  }
+  html.rail-open[data-nav="rail"] .bottom-nav {
+    transform: translate(0, -50%);
+    visibility: visible;
+    transition: transform .26s cubic-bezier(.3,1.25,.5,1), visibility 0s;
+  }
+  /* ボタンは上から35msずつずらして現れる */
+  html[data-nav="rail"] .nav-btn {
+    opacity: 0; translate: 14px 0;
+    transition: transform .12s ease-out, margin .12s ease-out, color .12s ease-out, opacity .18s ease-out var(--d, 0s), translate .26s cubic-bezier(.3,1.25,.5,1) var(--d, 0s);
+  }
+  html.rail-open[data-nav="rail"] .nav-btn { opacity: 1; translate: 0 0; }
+  html.rail-open[data-nav="rail"] .nav-btn:nth-child(2) { --d: 35ms; }
+  html.rail-open[data-nav="rail"] .nav-btn:nth-child(3) { --d: 70ms; }
+  html.rail-open[data-nav="rail"] .nav-btn:nth-child(4) { --d: 105ms; }
+  /* つまみ：見た目は幅5px・高さ44px、押せる所は幅16px・高さ64px。
+     Duo のシステムのつまみ（右端の真ん中）と重ならないよう、上から30%の高さに置く */
+  .rail-handle { display: none; }
+  html[data-nav="rail"] .rail-handle {
+    display: block; position: fixed; z-index: 6; top: 30%; margin-top: -32px;
+    right: env(safe-area-inset-right); width: 16px; height: 64px; padding: 0; border: none; background: transparent;
+    cursor: pointer; transition: opacity .15s ease-out;
+  }
+  html[data-nav="rail"] .rail-handle::before { content: ""; position: absolute; right: 4px; top: 10px; width: 5px; height: 44px; border-radius: 3px; background: #5c616b; }
+  html.rail-open[data-nav="rail"] .rail-handle { opacity: 0; pointer-events: none; }
+  /* 開いた最初の1回だけ、左に軽く2回揺れて存在を知らせる */
+  html[data-nav="rail"] .rail-handle.hint::before { animation: handle-hint .5s ease-in-out .5s; }
+  @keyframes handle-hint { 20% { transform: translateX(-5px); } 45% { transform: translateX(0); } 70% { transform: translateX(-5px); } 100% { transform: translateX(0); } }
+
   /* 端末の「視差効果を減らす」がオンのときは、動きを全部止める */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -2101,6 +2139,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     var pref = navPref();
     var mode = pref === "auto" ? (railAuto() ? "rail" : "bottom") : pref;
     document.documentElement.setAttribute("data-nav", mode);
+    if (mode !== "rail" && typeof setRailOpen === "function" && railOpen) setRailOpen(false);
     // 設定欄・選択シートのボタンは、描き直さずに印だけ付け替える（取り込み欄の入力を消さない）
     var btns = document.querySelectorAll('[data-action="set-nav-pref"]');
     for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("active", btns[i].dataset.pref === pref);
@@ -2208,10 +2247,35 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
       '</nav>';
   }
 
+  // ---- 右ナビの出し入れ：つまみのタップで出す。選んで0.7秒後・3秒操作なし・ほかの所をタップで隠す ----
+  var railOpen = false, railTimer = null, railHinted = false;
+  function railHandleHtml() {
+    var hint = "";
+    if (!railHinted && isRail()) { railHinted = true; hint = " hint"; }
+    return '<button class="rail-handle' + hint + '" data-action="open-rail" aria-label="ナビを開く"></button>';
+  }
+  function setRailOpen(open) {
+    railOpen = open;
+    document.documentElement.classList.toggle("rail-open", open);
+    clearTimeout(railTimer); railTimer = null;
+    if (open) railIdle();
+  }
+  function railIdle() {   // 3秒操作がなければ隠す（ナビを操作している間は数え直す）
+    clearTimeout(railTimer);
+    railTimer = setTimeout(function () { if (dock && dock.touch) railIdle(); else setRailOpen(false); }, 3000);
+  }
+  document.addEventListener("pointerdown", function (e) {
+    if (!railOpen || !isRail()) return;
+    var t = e.target;
+    if (t.closest && (t.closest(".bottom-nav") || t.closest(".rail-handle") || t.closest("#nav-sheet"))) { railIdle(); return; }
+    setRailOpen(false);   // ナビ以外の所をタップしたら隠す
+  }, true);
+
   function navigateTo(view) {
     navAnim = { view: view, burst: state.view !== view };
     if (state.view !== view) cue("view");
     setView(view);
+    if (isRail() && railOpen) { clearTimeout(railTimer); railTimer = setTimeout(function () { setRailOpen(false); }, 700); }
   }
 
   // ---- ドック：右ナビの上を指でなぞると、指に近いボタンほど大きくなる（最大1.55倍、90px離れると元の大きさ）----
@@ -2248,6 +2312,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     if (!dock) return;
     var d = dock; dock = null;
     d.btns.forEach(function (b) { b.style.transition = "transform .18s ease-out, margin .18s ease-out, color .12s ease-out"; b.style.transform = ""; b.style.margin = ""; });
+    setTimeout(function () { d.btns.forEach(function (b) { b.style.transition = ""; }); }, 220);
     var tip = d.nav.querySelector(".dock-tip"); if (tip) tip.classList.remove("show");
     return d;
   }
@@ -2264,13 +2329,14 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     if (e.pointerType === "mouse") {
       // PC：マウスを乗せるだけで拡大
       var nav = e.target.closest && e.target.closest(".bottom-nav");
-      if (nav) { if (!dock || dock.nav !== nav) dockBegin(nav); dockUpdate(e.clientY); }
+      if (nav) { if (!dock || dock.nav !== nav) dockBegin(nav); dockUpdate(e.clientY); if (railOpen) railIdle(); }
       else if (dock && !dock.touch) dockEnd();
       return;
     }
     if (dock && dock.touch) {
       if (Math.abs(e.clientY - dock.startY) > 6) dock.moved = true;
       dockUpdate(e.clientY);
+      if (railOpen) railIdle();
     }
   });
   document.addEventListener("pointerup", function (e) {
@@ -2293,7 +2359,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     app.innerHTML =
       '<header class="app-header"><span class="sync-badge" id="sync-badge" role="status">' + escapeHtml(syncBadgeText()) + '</span><h1>英単語クイズ</h1>' + themeButtonHtml() + '</header>' +
       '<main class="app-main">' + viewHtml() + '</main>' +
-      navHtml();
+      navHtml() + railHandleHtml();
     // 進み具合の棒は、前の長さからなめらかに伸ばす
     var bar = app.querySelector(".progress-bar span");
     if (bar) {
@@ -2321,6 +2387,7 @@ var statsDocRef = doc(db, "vocabQuiz", "stats");
     var action = target.dataset.action;
     switch (action) {
       case "nav": navigateTo(target.dataset.view); return;
+      case "open-rail": setRailOpen(true); return;
       case "toggle-theme": cycleTheme(); return;
       case "set-nav-pref": setNavPref(target.dataset.pref); return;
       case "close-nav-sheet": closeNavSheet(); return;
